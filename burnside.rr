@@ -1,0 +1,201 @@
+/*
+naive impletementation of Burside algorithm in Risa/Asir
+
+cf.
+Calculating Group Characters Algorithmically
+http://homepages.warwick.ac.uk/~masiao/maths/lecturenotes/burnside.pdf
+
+*/
+
+/* ObjがLSの要素かどうか */
+def memq(Obj , Ls){
+  for(K = 0; K < length(Ls) ; K++){
+     if(Obj==Ls[K])return 1;
+  }
+  return 0;
+}
+
+/* リストの連結 */
+def concat(Ls){
+  Ret = [];
+  for(I = 0 ; I < length(Ls) ; I++)Ret = append(Ret , Ls[I]);
+  return Ret;
+}
+
+/* 式に含まれる代数的数のリストを返す */
+def alnums(E){
+  Ret = [];
+  RealVars = vars(E);
+  AllVars = vars(algptorat(E));
+  for(I = 0 ; I < length(AllVars) ; I++){
+     if( memq(AllVars[I] , RealVars)==1 )continue;
+     for(L = 0 ; ; L++){
+         if( algv(L)==AllVars[I] ){
+              if( memq(alg(L) , Ret)==0 )Ret = cons(alg(L) , Ret);
+              break;
+         }
+     }
+  }
+  return Ret;
+}
+
+/*
+有限行列群の既約指標の計算
+G:有限行列群の要素の集合
+返り値:共役類上の各指標の値と各共役類に属する元の番号
+
+
+例:4次対称群
+irrec(grp([newmat(4,4,[[0,1,0,0],[1,0,0,0],[0,0,1,0],[0,0,0,1]]),
+           newmat(4,4,[[1,0,0,0],[0,0,1,0],[0,1,0,0],[0,0,0,1]]),
+           newmat(4,4,[[1,0,0,0],[0,1,0,0],[0,0,0,1],[0,0,1,0]])]
+         ));
+
+例:3次巡回群
+irrec([newmat(3,3,[[1,0,0],[0,1,0],[0,0,1]]),
+       newmat(3,3,[[0,1,0],[0,0,1],[1,0,0]]),
+       newmat(3,3,[[0,0,1],[1,0,0],[0,1,0]])]);
+
+*/
+def irrec(G){
+   Dim = size(G[0])[0];
+   Zero = newmat(Dim,Dim);
+   if(length(G)==1){return [ [[1]] , [[0]] ]; }
+   /* 有限行列群の基礎体の生成元 */
+   Field = getopt(field);
+   KVars = [];
+   if( type(Field)==4 ){
+      KVars = Field;  /* 代数的数のリストが与えられた場合 */
+   }else{
+      for(N = 0 ; N < length(G) ; N++){
+         for(I= 0 ; I < size(G[N])[0] ; I++){
+            for(J = 0 ; J < size(G[N])[1] ; J++){
+               Nums = alnums(G[N][I][J]);
+               for(K = 0; K < length(Nums) ; K++){
+                  if( memq(Nums[K] , KVars)==0 )KVars = cons(Nums[K] , KVars);
+               }
+            }
+         }
+      }
+   }
+   /* 共役類の決定(もっと効率のいいアルゴリズムがある?) */
+   CC = [];
+   for(N = 0 ; N < length(G) ; N++){
+      if( memq(N , concat(CC))==1 )continue;
+      Tmp = [N];
+      for( I = 0 ; I < length(G) ; I++){
+          H = invmat(G[I]);
+          X = H[0]*G[N]*G[I]/H[1];
+          for(J = 0 ; J < length(G) ; J++){
+              if( map(simpalg , X-G[J])==Zero ){
+                  if( memq(J , Tmp)==0 ) Tmp=cons(J , Tmp);
+                  break;
+              }
+          }
+      }
+      CC = cons(Tmp , CC);
+   }
+   CC = reverse(CC);
+   /* 共役類の逆元が、どの共役類に入ってるか調べておく */
+   ConjPair = newvect(length(CC));
+   for(I = 0 ; I < length(CC) ; I++){
+      H=invmat(G[CC[I][0]])[0];
+      for(J = 0 ; J < length(G) ; J++){
+         if(H==G[J])break;
+      }
+      for(K = 0 ; K <length(CC) ; K++){
+         if( memq(J , CC[K])==1 ){
+            ConjPair[I] = K;
+            break;
+         }
+      }
+   }
+   /* compute class multiplication coefficients */
+   MC = newvect(length(CC));
+   for(I = 0 ; I < length(CC) ; I++){
+      CMat = newmat(length(CC) , length(CC));
+      for(J = 0 ; J < length(CC) ; J++){
+          for(Ix = 0 ; Ix < length(CC[I]) ; Ix++){
+              for(Jx = 0 ; Jx < length(CC[J]) ; Jx++){
+                  X = G[CC[I][Ix]];
+                  Y = G[CC[J][Jx]];
+                  Z = X*Y;
+                  for(K = 0 ; K < length(G) ; K++){
+                      if( map(simpalg , Z-G[K])==Zero )break;
+                  }
+                  for(L = 0 ; L < length(CC) ; L++){
+                     if( memq(K , CC[L])==1 ){
+                         CMat[J][L] += 1/length(CC[L]);
+                         break;
+                     }
+                  }
+              }
+          }
+      }
+      MC[I] = CMat;
+   }
+   /* compute irreducible characters */
+   HVals = map(length,CC);
+   Omega = [];
+   for(I = 0 ; I < length(MC) ; I++){
+      /* MCの一次独立な同時固有ベクトルを見つける */
+      P = linalg.jordan_canonical_form(MC[I] | ext=KVars);
+      JMat = P[0];
+      for(T=0 ; T < length(P[1]) ; T++){
+         if(P[1][T][2]!=1)continue;
+         if(length(P[2])!=0){
+            /* 新しく得られた代数的数の調整 */
+            NewRels = gr(P[2][0] , vars(P[2][0]) , 2);
+            VarToNum = [];
+            for(J = 0 ; J < length(NewRels) ; J++){
+               CurRel = NewRels[J];
+               for(K = 0 ; K < length(VarToNum) ; K++){
+                 CurRel = subst(CurRel , VarToNum[K][0] , VarToNum[K][1]);
+               }
+               NewAlg = newalg(CurRel);
+               KVars = cons(NewAlg , KVars);
+               VarToNum = cons([var(CurRel) , NewAlg] , VarToNum);
+            }
+            for(L = 0 ; L < length(VarToNum) ; L++){
+              for(J = 0 ; J < length(CC) ; J++){
+                 for(K = 0 ; K < length(CC) ; K++){
+                   JMat[J][K] = subst(JMat[J][K] , VarToNum[L][0] , VarToNum[L][1]);
+                 }
+              }
+            }
+         }
+         if(length(Omega)!=length(CC)){
+             NewVect = newvect(length(CC));
+             for(TT=0;TT<length(CC);TT++){
+                NewVect[TT] = JMat[TT][T];
+             }
+             /* TODO:NewVectがEigenVectorsから独立であることのチェック */
+             Omega = cons(NewVect , Omega);
+         }
+      }
+      if(length(Omega) < length(CC))continue;
+      /* 既約指標の共役類上の値の計算 */
+      /* 自明な共役類上の指標の値 */
+      DVals = [];
+      for(R = 0 ; R < length(CC) ; R++){
+         DVal = 0;
+         for(C = 0 ; C < length(CC) ; C++){
+              DVal += Omega[R][C]*Omega[R][ConjPair[C]]/HVals[C];  
+         }
+         DVal = simpalg(length(G)/DVal);
+         DVals = cons(isqrt(DVal) , DVals);
+      }
+      DVals = reverse(DVals); 
+      /* 各共役類上の指標の値の計算 */
+      Ret = [];
+      for(R = 0 ; R < length(CC) ; R++){
+         ChiVals = [];
+         for(C = 0 ; C < length(CC) ; C++){
+              ChiVals = cons(simpalg(Omega[R][C]*DVals[R]/HVals[C]) , ChiVals);
+         }
+         Ret = cons(reverse(ChiVals) , Ret);
+      }
+      return [reverse(Ret) , CC];
+   }
+}
+

@@ -1,0 +1,438 @@
+/*
+Hilbertイデアルを計算するDerksenのアルゴリズム
+
+参考:
+[1]Harm Derksen , Computation of Invariants for Reductive Groups
+Advances in Mathematics 141, 366–384, 1999;
+
+[2]Computational Invariant Theory
+by Derksen,Kemper
+http://www.amazon.co.jp/dp/364207796X
+
+
+正標数の場合については
+[3]Gregor Kemper, Computing invariants of reductive groups in positive characteristic
+Transformation Groups 8,159-176,2003
+*/
+
+load("gr");
+load("noro_pd.rr");
+load("noro_matrix.rr");
+
+
+def memq(Obj , Ls){
+  for(K = 0; K < length(Ls) ; K++){
+     if(Obj==Ls[K])return 1;
+  }
+  return 0;
+}
+
+/*
+
+例1:SL(2)の3次元既約表現
+derksen([a*d-b*c-1] , newmat(3,3,[[a^2 , 2*a*b , b^2],[a*c , a*d+b*c , b*d],[c^2 ,2*c*d ,d^2]]) , [x,y,z]);
+
+
+例2:三角形の合同変換
+derksen([c*c+s*s-1] , 
+        newmat(7,7,[[c,s,0,0,0,0,a],
+                    [-s,c,0,0,0,0,b],
+                    [0,0,c,s,0,0,a],
+                    [0,0,-s,c,0,0,b],
+                    [0,0,0,0,c,s,a],
+                    [0,0,0,0,-s,c,b],
+                    [0,0,0,0,0,0,1]]) , 
+        [x1,y1,x2,y2,x3,y3,z]);
+
+例3:SL(2)の4次元既約表現
+derksen([a*d-b*c-1] , 
+        newmat(4,4,[[a^3 , 3*a^2*b , 3*a*b^2 , b^3],
+                    [a^2*c , a^2*d + 2*a*b*c , 2*a*b*d+b^2*c , b^2*d],
+                    [a*c^2 ,2*a*c*d + b*c^2 , a*d^2+2*b*c*d , b*d^2],
+                    [c^3 , 3*c^2*d , 3*c*d^2, d^3 ]]) , 
+        [x,y,z,w]);
+
+
+例4:Derksenの論文にあるGL(1)の4次元表現
+derksen([x*y-1] ,
+        newmat(4,4,[[x^5 , 0,0,0],[0,x^3,0,0],[0,0,y^2,0],[0,0,0,y^4]]),
+        [t1,t2,t3,t4]);
+
+
+例5:Derksenの論文にあるSL(2)の7次元表現(この例で得られる生成元は不変式でない多項式を含む)
+derksen([a*d-b*c-1] ,
+        newmat(7,7,[[a,b,0,0,0,0,0],
+                    [c,d,0,0,0,0,0],
+                    [0,0,a,b,0,0,0],
+                    [0,0,c,d,0,0,0],
+                    [0,0,0,0,a^2,2*a*b,b^2],
+                    [0,0,0,0,a*c,a*d+b*c,b*d],
+                    [0,0,0,0,c^2 ,2*c*d ,d^2]]),
+        [x1,x2,x3,x4,x5,x6,x7]);
+
+
+例6:from arXiv:0807.3476 Proposition5.1
+derksen([a*d-b*c-1] ,
+        newmat(5,5,[[a^2,2*a*b,b^2,0,0],
+                    [a*c,a*d+b*c,b*d,0,0],
+                    [c^2,2*c*d,d^2,0,0],
+                    [0,0,0,a,b],
+                    [0,0,0,c,d]]),
+        [a0,a1,a2,x1,x2]);
+
+
+例7:SL(n)の自然表現のm次対称テンソル表現
+def gen_monomial(Vars , Deg){
+  RET = [];
+  if( length(Vars)<=1 ){
+     return [Vars[0]^Deg];
+  }else{
+     for(I= 0 ; I <= Deg ; I++){
+        Cur = Vars[0]^I;
+        Tmp = gen_monomial(cdr(Vars) , Deg-I);
+        for(J = 0 ; J < length(Tmp) ; J++){
+          RET = cons(Cur*Tmp[J] , RET);
+        }
+     }
+  }
+  return RET;
+}
+
+def symmrep(N , M){
+  Xs = [];
+  Ys = [];
+  RM = newmat(N,N);
+  for(I = 0 ; I < N ; I++){
+     Xs = cons(strtov("x"+rtostr(I+1)) , Xs);
+     Ys = cons(strtov("y"+rtostr(I+1)) , Ys);
+     for(J = 0 ; J < N ; J++){
+        RM[I][J] = strtov( "a" + rtostr(I+1) + rtostr(J+1));
+     }
+  }
+  Monomials = gen_monomial(Xs , M);
+  Cs = [];
+  for(I = 0 ; I < length(Monomials) ; I++){
+     Cs = cons(strtov("c" + rtostr(I+1)) , Cs);
+  }
+  Xs = reverse(Xs);
+  Ys = reverse(Ys);
+  Cs = reverse(Cs);
+  F = 0;
+  for(I = 0 ; I < length(Monomials) ; I++){
+     F += Cs[I]*Monomials[I];
+  }
+  R = F;
+  for( I = 0 ; I < N ; I++){
+     P = 0;
+     for(J = 0 ; J < N ; J++)P+=RM[I][J]*Ys[J];
+     F = subst(F , Xs[I] , P);
+  }
+  Ret = newmat(length(Monomials) , length(Monomials));
+  for(I = 0 ; I< size(Ret)[0] ; I++){
+      for(J = 0 ; J<size(Ret)[1] ; J++){
+          P = coef(F , 1 , Cs[I]);
+          Q = coef(R , 1 , Cs[J]);
+          for(K = 0 ; K < N ; K++){
+              P = coef(P , deg(Q,Xs[K]) , Ys[K]);
+          }
+          Ret[I][J] = P;
+      }
+  }
+  return Ret;
+}
+
+derksen([a11*a22-a12*a21-1] , symmrep(2,3) , [x0,x1,x2,x3]);
+
+
+例8:SL(3)の随伴表現
+M=newmat(3,3,[[a11,a12,a13],[a21,a22,a23],[a31,a32,a33]])*newmat(3,3,[[x1,x2,x3],[x4,x5,x6],[x7,x8,-x1-x5]])*newmat(3,3,[[a22*a33-a23*a32,a13*a32-a12*a33,a12*a23-a13*a22],[a23*a31-a21*a33,a11*a33-a13*a31,a13*a21-a11*a23],[a21*a32-a22*a31,a12*a31-a11*a32,a11*a22-a12*a21]]);
+
+R=newmat(8,8);
+P = [[1,1],[1,2],[1,3],[2,1],[2,2],[2,3],[3,1],[3,2]];
+V = [x1,x2,x3,x4,x5,x6,x7,x8];
+for(I = 0 ; I < 8 ; I ++){
+   for(J = 0 ; J < 8 ; J++){
+      R[I][J] = coef(M[P[I][0]-1][P[I][1]-1] , 1 , V[J]);
+   }
+}
+
+derksen([(a11*a33-a31*a13)*a22-a21*a12*a33+(-a11*a32+a31*a12)*a23+a21*a13*a32-1] , R , [x1,x2,x3,x4,x5,x6,x7,x8]);
+
+*/
+
+
+def derksen(IG , RM , Xs){
+   G = IG;
+   GVars = vars(IG);
+   Ys = [];
+   for(I = 0 ; I< length(Xs) ; I++){
+      YI = uc();
+      Expr = 0;
+      Ys = cons(YI , Ys);
+      for(J = 0 ; J < length(Xs) ; J++){
+          TmpVars = vars(RM[I][J]);
+          for(K = 0 ; K < length(TmpVars) ; K++){
+             if( memq(TmpVars[K] , GVars)==0 )GVars = cons(TmpVars[K] , GVars); 
+          }
+          Expr += RM[I][J]*Xs[J];
+      }
+      G = cons(YI - Expr , G);
+   }
+   AllVars = append(GVars , append(Xs,Ys));
+   G = nd_gr_trace(G , AllVars , 1 , 1 , [[0,length(GVars)],[0,length(Xs)+length(Ys)]]);
+   G = noro_pd.elimination(G , append(Xs,Ys));
+   Ret = [];
+   for(G = G ; G!=[] ; G=cdr(G)){
+      P = car(G);
+      for(I = 0 ; I < length(Xs) ; I++)P = subst(P , Ys[I] , 0);
+      if(P!=0)Ret = cons(P,Ret);
+   }
+   return Ret;
+}
+
+
+
+
+/*
+多項式P中の単項式Mの係数を計算する
+monocoef(x^3*y^2+2*x*y^2+2*x*y , x*y^2);
+なら、2を返す
+*/
+def monocoef(P,M){
+   if( nmono(M)!=1 )return 0;
+   Ret = P;
+   if(vars(M)!=[]){
+      V = vars(M);
+      Degs = newvect(length(V));
+      for(I = 0 ; I <length(V) ; I++)Degs[I] = deg(M , V[I]);
+      for(V = V , D=vtol(Degs); V!=[] ; V=cdr(V) , D=cdr(D)){
+          Ret = coef(Ret , car(D) , car(V));
+      }
+      
+   }
+   for(V = vars(P) ; V!=[] ; V=cdr(V)){
+      Ret = coef(Ret , 0, car(V));
+   }
+   return Ret;
+}
+
+
+
+/*
+微分作用素Pを式Fに適用する
+Vは、dp_weyl_mulなどで使用するWeyl代数の変数指定法に従う
+
+
+Risa/Asirの微分作用素の扱いは、結構酷いので注意
+X = dp_ptod(x,[x,d]);  // 只の変数
+D = dp_ptod(d,[x,d]);  // D=d/dXとする
+dp_weyl_mul(D,X);      // 期待通りの挙動
+dp_weyl_mul(X,D);      // 期待通りの挙動
+dp_ptod(d*x , [x,d]);  // Risa/Asirの不定元は基本的に可換なので、これはx*dと見なされる(区別できない)
+dp_dtop(dp_weyl_mul(X,D) , [x,d]);  // 内部的には、d*xとx*dを区別してないので表示には注意
+dp_dtop(dp_weyl_mul(D,X),[x,d]);    // x*dとd*xを区別してないので、d*x+1と返ってくるかもしれない
+
+
+Examples:
+appdiff(x*d , x^3, [x,d]);
+appdiff(x1*x2*d1^2 + x2^3*d1*d2 , x1^3+x2*x1^2+2 , [x1,x2,d1,d2]);
+appdiff(dp_weyl_mul(dp_ptod(d,[x,d]),dp_ptod(x,[x,d])) , x^2  , [x,d]);
+
+*/
+def appdiff(P , F , V){
+   N = length(V)/2;
+   if(type(P)==9){  /* 分散多項式表現の時 */
+      DP = dp_dtop(P, V);
+   }else{
+      DP = P;
+   }
+   Terms = p_terms(DP , V , 2);
+   for(Ret = 0 , Terms = Terms; Terms!=[] ; Terms=cdr(Terms)){
+      T = car(Terms);
+      C = monocoef(DP, T);
+      Tmp = F;
+      for(I = 0 ; I < N ; I++){
+         D = deg(T , V[N+I]);
+         for(J = 0 ; J < D ; J++){
+            Tmp = diff(Tmp , V[I]);
+         }
+      }
+      for(I = 0 ; I < N ; I++){
+         D = deg(T , V[I]);
+         Tmp *= V[I]^D;
+      }
+      Ret += C*Tmp;
+   }
+   return Ret;
+}
+
+
+
+/*
+半単純Lie環のCasimir作用素Cから多項式FにReynolds作用素を適用した結果を計算する
+Vは、dp_weyl_mulなどで使用するWeyl代数の変数指定法に従う
+
+
+例:SL(2)の3次元既約表現
+V = [x0,x1,x2,d0,d1,d2];
+E = dp_ptod(2*x1*d0 + x2*d1 , V);
+F = dp_ptod(x0*d1 + 2*x1*d2 , V);
+H = dp_ptod(-2*x0*d0 + 2*x2*d2 , V);
+Omega = dp_weyl_mul(dp_ptod(1/4,V) , dp_weyl_mul(E,F)) + 
+        dp_weyl_mul(dp_ptod(1/4,V) , dp_weyl_mul(F,E)) + 
+        dp_weyl_mul(dp_ptod(1/8,V) , dp_weyl_mul(H,H));
+
+reynolds(Omega , x1^2 , V);
+
+
+*/
+def reynolds(C , F , V){
+   if(type(F)==1)return F;  //定数の場合
+   Fs = [F];
+   Monomials = p_terms(F,V,0);
+   for(N = 0 ; ; N++){
+       NewF = appdiff(C , Fs[0] , V);
+       Fs = cons(NewF , Fs);
+       for(T = p_terms(NewF , V , 0) ; T!=[] ; T=cdr(T)){
+          if( memq(car(T) , Monomials)==0 )Monomials=cons(car(T) , Monomials);
+       }
+       M = newmat(length(Monomials) , length(Fs));
+       for(I = 0 ; I < length(Monomials) ; I++){
+          for(J = 0 ; J < length(Fs) ; J++){
+             M[I][J] = monocoef(Fs[J] , Monomials[I]);
+          }
+       }
+       NV = linalg.compute_kernel(M);
+       if(NV!=[]){
+            NV = NV[0][0];
+            break;
+       }
+   }
+   P0 = NV[length(NV)-1];
+   if(P0!=0){
+       return 0;
+   }else{
+       Q0 = NV[length(NV)-2];
+       Q = dp_ptod(0 , V);
+       if(type(C)!=9){ /* 分散多項式表現でない時は、分散多項式表現に変換 */
+           DC = dp_ptod(C , V);
+       }else{
+           DC = C;
+       }
+       for(NV=vtol(NV) ; length(NV)!=1 ; NV=cdr(NV)){
+           Q = dp_weyl_mul(Q , DC) + dp_ptod(car(NV),V);
+       }
+       return appdiff(Q , F , V)/Q0;
+   }
+}
+
+
+
+/*
+Casimir作用素を計算する
+casimir([a*d-b*c-1] , newmat(3,3,[[a^2,2*a*b,b^2],[a*c,a*d+b*c,b*d],[c^2,2*c*d,d^2]]) , [x,y,z,dx,dy,dz]);
+*/
+
+def casimir(IG , RM , WeylVars){
+   GV = vars(RM);
+   N = size(RM)[0];
+   Z = newvect(N*N);
+   Eps = uc();
+   RG = [];
+   for(I=0;I<N;I++){
+      for(J=0;J<N;J++){
+         Z[I*N+J] = uc();
+         RG = cons(Z[I*N+J] - RM[I][J] , RG);
+      }
+   }
+   G = nd_gr_trace(append(RG , IG) , append(GV , vtol(Z)) , 1 , 1 , [[0,length(GV)] , [0,N*N]]);
+   G = noro_pd.elimination(G , vtol(Z));
+   /* 微分表現の像 */
+   LG = [];
+   for(G = G ; G!=[] ; G=cdr(G)){
+      P = car(G);
+      for(I = 0; I < N ; I++){
+          for(J = 0 ; J < N ; J++){
+             if(I==J){
+                P = subst(P , Z[I*N+J] , 1+Eps*Z[I*N+J]);
+             }else{
+                P = subst(P , Z[I*N+J] , Eps*Z[I*N+J]);
+             }
+          }
+      }
+      LG = cons(coef(P , 1 , Eps) , LG);
+   }
+   LG = nd_gr(LG , vtol(Z) , 0 , 0);
+   CMat = newmat(length(LG) , N*N);
+   for(J = 0 ; J < N*N ; J++){
+      for(I = 0 ; I < length(LG) ; I++){
+         CMat[I][J] = coef(LG[I] , 1 , Z[J]);
+      }
+   }
+   /* Lie環の基底 */
+   LBase = [];
+   for(Vecs = linalg.compute_kernel(CMat) ; Vecs!=[] ; Vecs=cdr(Vecs)){
+       Vec = car(Vecs)[0];
+       Basis = newmat(N,N);
+       for(I = 0 ; I < N ; I++){
+          for(J = 0 ; J < N ; J++){
+             Basis[I][J] = Vec[I*N+J];
+          }
+       }
+       LBase = cons(Basis , LBase);
+   }
+   /* adjoint matrix */
+   Adj = [];
+   for(I = length(LBase)-1 ; I>=0 ; I--){
+      AM = newmat(length(LBase) , length(LBase));
+      for(J = 0 ; J < length(LBase) ; J++){
+         RM = LBase[I]*LBase[J] - LBase[J]*LBase[I];
+         for(K = 0 ; K < length(LBase) ; K++){
+            C = 0;
+            S = 0;
+            for(I1 = 0 ; I1 < N ; I1++){
+               for(J1 = 0 ; J1 < N ; J1++){
+                  C += RM[I1][J1]*LBase[K][I1][J1];
+                  S += LBase[K][I1][J1]*LBase[K][I1][J1];
+               }
+            }
+            AM[J][K] = C/S;
+         }
+      }
+      Adj = cons(AM,Adj);
+   }
+   /* Killing形式 */
+   Beta = newmat(length(Adj) , length(Adj));
+   for(I = 0 ; I < length(Adj) ; I++){
+      for(J = 0 ; J < length(Adj) ; J++){
+          RM = Adj[I] * Adj[J];
+          T = 0;
+          for(K = 0 ; K < length(LBase) ; K++)T+=RM[K][K];
+          Beta[I][J] = T;
+      }
+   }
+   /* 多項式環への作用 */
+   DR = [];
+   for(LBase = LBase ; LBase!=[] ; LBase=cdr(LBase)){
+      Base = car(LBase);
+      D = 0;
+      for(P = 0 ; P < N ; P++){
+          for(Q = 0 ; Q < N ; Q++){
+              D+= Base[P][Q]*WeylVars[P]*WeylVars[Q+N];
+          }
+      }
+      DR=cons(D,DR);
+   }
+   DR = reverse(DR);
+   /* Casimir作用素 */
+   Gamma = invmat(Beta);
+   Gamma = Gamma[0]/Gamma[1];
+   Cas = 0;
+   for(I = 0 ; I < length(DR) ; I++){
+       for(J = 0 ; J < length(DR) ; J++){
+          Cas += Gamma[I][J]*dp_weyl_mul(dp_ptod(DR[I] , WeylVars) , dp_ptod(DR[J] , WeylVars));
+       }
+   }
+   return Cas;
+}
+

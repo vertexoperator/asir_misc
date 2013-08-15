@@ -1,0 +1,99 @@
+load("gr");
+load("sp");  /* 最小分解体の計算 */
+
+/* 補助関数 */
+def select1(CUR , LS){
+   RET = [];
+   if(length(CUR)==0){
+      for(I=0;I<length(LS);I++){
+         RET = cons( [LS[I]] , RET);
+      }
+      return RET;
+   }
+   for(I = 0 ; I<length(CUR) ; I++){
+       TMP = CUR[I];
+       NewElems = [];
+       for(K=0;K<length(LS);K++){
+          OK = 1;
+          for(J=0;J<length(TMP);J++){
+              if(TMP[J]==LS[K])OK = 0;
+          }
+          if(OK)NewElems = cons(LS[K] , NewElems);
+       }
+       for(L=0;L<length(NewElems);L++){
+          RET=cons(cons(NewElems[L],TMP) , RET);
+       }
+   }
+   return RET;
+}
+
+/* LSの中からN個の要素を抽出したリストのリスト */
+def select(LS , N){
+   RET = [];
+   for(I=0;I<N;I++){
+      RET = select1(RET , LS);
+   }
+   return RET;
+}
+
+
+/*
+方程式のGalois群を計算する
+
+返り値は、方程式の解のうち、最小分解体の生成元を与えるものの置換の像
+リストの最初の要素が、恒等写像を作用した結果
+
+例:x^4-2の場合(Galois群の位数は8)
+galois(x^4-2)は、以下のような結果を返す
+[[t#19,t#20],[-t#19,t#20],[t#19,-t#20],[-t#19,-t#20],
+[t#20,t#19],[-t#20,t#19],[t#20,-t#19],[-t#20,-t#19]]
+
+方程式の解は、[t#19 , t#20 , -t#19 , -t#20]で、
+(t#19,t#20)->(t#19,-t#19)のような解の置換は許されない
+
+*/
+
+def galois(F){
+  Sols = sp(F);
+  Roots = [];
+  Rels = [];
+  Vars = [];
+  for(I = 0 ; I < length(Sols[0]) ; I++){
+     C = coef(Sols[0][I] , 1, var(F));
+     Roots = cons(var(F) - algptorat(Sols[0][I])/C , Roots);
+  }
+  for(I = 0 ; I < length(Sols[1]) ; I++){
+     Rels = cons(defpoly(Sols[1][I][0]) , Rels);
+     Vars = cons(algptorat(Sols[1][I][0]) , Vars);
+  }
+  /* ==================== */
+  Basis = gr(Rels , Vars , 0);
+  Perms = select(Roots , length(Vars));
+  TmpVars = [];
+  for(I=0;I<length(Vars);I++)TmpVars = cons(uc() , TmpVars);
+  Ret = [];
+  for(I = 0 ; I < length(Perms) ; I++){
+     if( Perms[I]==Vars )continue;
+     for(J = 0 ; J<length(Rels) ; J++){
+        /* (x,y) -> (p(x,y) , q(x,y))みたいな同時代入を行いたい */
+        /* subst(F , x , p(x,y) , y , q(x,y))の結果は */
+        /* F(p(x,q(x,y)) , q(x,y))のようになってしまう */
+        Expr = Rels[J];
+        for(K = 0 ; K < length(Vars) ; K++){
+           Perm = Perms[I][K];
+           for(L = 0 ;L < length(Vars) ; L++){
+              Perm = subst(Perm , Vars[L] , TmpVars[L]);
+           }
+           Expr = subst(Expr , Vars[K] , Perm);
+        }
+        for(K = 0 ; K < length(Vars) ; K++){
+           Expr = subst(Expr , TmpVars[K] , Vars[K]);
+        }
+        /* ここまで代入処理 */
+        if( p_nf(Expr , Basis , Vars , 0)!=0 )break;
+        if( J==length(Rels)-1 )Ret = cons(Perms[I] , Ret);
+     }
+  }
+  return cons(Vars , Ret);
+}
+
