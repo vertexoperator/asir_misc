@@ -1,5 +1,5 @@
 /*
-naive impletementation of Burside algorithm in Risa/Asir
+naive impletementation of Burnside(-Dixon-Schneider) algorithm in Risa/Asir
 
 cf.
 Calculating Group Characters Algorithmically
