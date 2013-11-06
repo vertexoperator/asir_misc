@@ -178,7 +178,7 @@ def derksen(IG , RM , Xs){
       }
       G = cons(YI - Expr , G);
    }
-   AllVars = append(GVars , append(Xs,Ys));
+   AllVars = append(GVars , append(Ys,Xs));
    G = nd_gr_trace(G , AllVars , 1 , 1 , [[0,length(GVars)],[0,length(Xs)+length(Ys)]]);
    G = noro_pd.elimination(G , append(Xs,Ys));
    Ret = [];
