@@ -24,6 +24,7 @@ linvar([c*c+s*s-1] ,
                     [0,0,0,0,0,0,1]]) ,
         [x1,y1,x2,y2,x3,y3,z]);
 
+
 linvar([a*d-b*c-1] , newmat(3,3,[[a^2 , 2*a*b , b^2],[a*c , a*d+b*c , b*d],[c^2 ,2*c*d ,d^2]]) , [x,y,z]);
 
 
@@ -267,6 +268,9 @@ def localizedInvariants(IX , Xs , IG , Zs , GReps){
          QPols = cons(QI[I] , QPols);
       }
    }
+   if(QRats==[]){
+      return [1,QPols];
+   }
    Hs = map(dn , QRats);
    Fs = map(nm , QRats);
    /* step(8)(9)(10) */
@@ -324,7 +328,6 @@ def localizedInvariants(IX , Xs , IG , Zs , GReps){
              PMat[K][I] = NF_G[I];
           }
       }
-
       CMat = newmat(length(Terms)*(K+1) , L*(K+1));
       for(Idx = 0 , F = 0 ; F < length(Terms) ; F++){
          for(W = 0 ; W < size(PMat)[0] ; W++ , Idx++){
@@ -360,7 +363,6 @@ def localizedInvariants(IX , Xs , IG , Zs , GReps){
 }
 
 
-
 def linvar(IG , RM , Xs){
    GVars = append(vars(IG) , vars(RM));
    NM = size(RM);
@@ -375,11 +377,9 @@ def linvar(IG , RM , Xs){
    AB = localizedInvariants([] , Xs , IG , GVars , reverse(Ts));
    AP = AB[0];
    BPols = AB[1];
-   /*  print(BPols);  */
    /* start algorithm 7.1 */
    Ret = [];
    for(Deg = 1 ; ; Deg++){
-      /*  print(Ret);  */
       G = [];
       Ys = newvect(length(Ret));
       for(I = 0 ; I < length(Ret) ; I++){
@@ -406,7 +406,9 @@ def linvar(IG , RM , Xs){
              break;
          }
       }
-      if(Check1==1){
+      if(AP==1){
+         Check2 = Check1;
+      }else if(Check1==1){
          Check2 = 1;
          for(Hs = J ; Hs!=[] ; Hs=cdr(Hs)){
              HPol = red(msubst(car(Hs) , vtol(Ys) , Ret)/AP);
@@ -423,10 +425,9 @@ def linvar(IG , RM , Xs){
       for(S=homogeneousInvariants(IG,RM,Xs,Deg) ; S!=[] ; S=cdr(S)){
          SPol = p_nf(car(S) , Jhat , append(Xs , vtol(Ys)) , 0);
          if( intersect(vars(SPol) , Xs)!=[] ){
-            Ret = cons(SPol, Ret);
+            Ret = cons(car(S), Ret);
          }
       }
    }
 }
-
 
