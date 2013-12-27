@@ -84,7 +84,6 @@ def monocoef(P,M,V){
 }
 
 
-
 def gen_monomials(Deg , V){
    if(Deg==0)return [1];
    Ret = [];
@@ -117,6 +116,35 @@ def msubst(P , Vars , Exprs){
    return TP;
 }
 
+/*
+多項式係数の行列の定数係数のKernelを計算する
+*/
+def p_compute_kernel(PMat){
+   Sz = size(PMat);
+   Vars = vars(PMat);
+   N = Sz[0];
+   M = Sz[1];
+   RPol = 0;
+   for(I = 0 ; I < N ; I++){
+      for(J = 0 ; J < M ; J++){
+          for(V = dp_ptod(PMat[I][J] , Vars) ; V ; V=dp_rest(V)){
+             RPol = RPol + dp_ht(V);
+          }
+      }
+   }
+   Terms = [];
+   for(V=RPol;V;V=dp_rest(V)){Terms = cons(dp_ht(V) , Terms);}
+   CMat = newmat(length(Terms)*N , M);
+   for(Idx = 0 , Terms = Terms ; Terms!=[] ; Terms=cdr(Terms)){
+      Term = dp_dtop(car(Terms) , Vars);
+      for(W = 0 ; W < N ; W++ , Idx++){
+           for(H = 0 ; H < M ; H++){
+               CMat[Idx][H] = monocoef(PMat[W][H] , Term , Vars);
+           }
+      }
+   }
+   return linalg.compute_kernel(CMat);
+}
 
 
 /*
@@ -152,28 +180,7 @@ def homogeneousInvariants(IG , RM , Xs , D){
         Q = msubst(P , Xs , Ys) - P;
         HPols = cons(p_nf(Q , G , GVars , 0) , HPols);
     }
-    HPols = reverse(HPols);
-    for(Hs=HPols,RPol=0; Hs!=[] ; Hs=cdr(Hs)){
-         for(V=dp_ptod(car(Hs),AllVars) ; V ; V=dp_rest(V)){
-             RPol = RPol + dp_ht(V);
-         }
-    }
-    Terms = [];
-    for(V=RPol;V;V=dp_rest(V)){Terms = cons(dp_ht(V) , Terms);}
-    Terms = reverse(Terms);
-    /* Termsの各項はソートされてることに注意 */
-    CMat = newmat(length(Terms) , length(HPols));
-    for(Hs = HPols,J=0 ; Hs!=[] ; Hs=cdr(Hs) ,J++){
-       V = dp_ptod(car(Hs),AllVars);
-       for(Ts = Terms ,I=0; Ts!=[] ; Ts=cdr(Ts),I++){
-           if(dp_ht(V)==dp_ht(car(Ts))){
-              CMat[I][J] = dp_hc(V);
-              V = dp_rest(V);
-              if(!V)break;
-           }
-       }
-    }
-    Kernel = linalg.compute_kernel(CMat);
+    Kernel = p_compute_kernel(newmat(1 , length(HPols) , [reverse(HPols)]));
     Ret = [];
     for(I = 0 ; I < length(Kernel) ; I++){
        Evec = Kernel[I][0];
@@ -222,7 +229,6 @@ def rationalInvariants(IY , Ys , IX , Xs , Ord){
 }
 
 
-
 /*
 algorithm6.1
 
@@ -246,7 +252,7 @@ def localizedInvariants(IX , Xs , IG , Zs , GReps){
    }
    /* step(3) */
    AllVars = append(Zs , append(Ys, Xs));
-   Ghat = nd_gr(Ehat , AllVars , 0 , [[0,length(Zs)],[0,length(Ys)],[0,length(Xs)]]);
+   Ghat = nd_gr_trace(Ehat , AllVars , 1 , 1 , [[0,length(Zs)],[0,length(Ys)],[0,length(Xs)]]);
    G = noro_pd.elimination(Ghat , append(Xs , Ys));
    Gx = noro_pd.elimination(Ghat , Xs);
    Gy = diffset(G , Gx);
@@ -284,8 +290,6 @@ def localizedInvariants(IX , Xs , IG , Zs , GReps){
       NF_fm = newmat(L,K);
       NF_hm = newmat(L,K);
       NF_G = [];
-      Pols = [];
-      Terms = [];
       for(I = 0 ; I < L ; I++){
          P = msubst(Monomials[I] , Xs , GReps) - Monomials[I];
          P = p_nf(P , Gx , Xs , 0);
@@ -294,18 +298,9 @@ def localizedInvariants(IX , Xs , IG , Zs , GReps){
          for(J = 0 ; J < K ; J++){
             NF_fm[I][J] = p_nf(Fs[J]*Monomials[I] , Gx , Xs , 0);
             NF_hm[I][J] = p_nf(Hs[J]*Monomials[I] , Gx , Xs , 0);
-            Pols = cons(NF_fm[I][J] , Pols);
-            Pols = cons(NF_hm[I][J] , Pols);
          }
-         Pols = cons(P , Pols);
       }
       NF_G = reverse(NF_G);
-      for(Ps=Pols , RPol=0 ; Ps!=[] ; Ps=cdr(Ps)){
-          for(V=dp_ptod(car(Ps),append(Xs,Zs)) ; V ; V=dp_rest(V)){
-             RPol = RPol + dp_ht(V);
-          }
-      }
-      for(V=RPol;V;V=dp_rest(V)){Terms = cons(dp_dtop(dp_ht(V),append(Xs,Zs)) , Terms);}
       /* solve equations in step(9) */
       PMat = newmat(K+1 , L*(K+1));
       for(J = 0 ; J < K ; J++){
@@ -321,22 +316,13 @@ def localizedInvariants(IX , Xs , IG , Zs , GReps){
              PMat[K][I] = NF_G[I];
           }
       }
-      CMat = newmat(length(Terms)*(K+1) , L*(K+1));
-      for(Idx = 0 , F = 0 ; F < length(Terms) ; F++){
-         for(W = 0 ; W < size(PMat)[0] ; W++ , Idx++){
-             for(H = 0 ; H < size(PMat)[1] ; H++){
-                 CMat[Idx][H] = monocoef(PMat[W][H] , Terms[F] , append(Xs,Zs));
-             }
-         }
-      }
-      Kernel = linalg.compute_kernel(CMat);
+      Kernel = p_compute_kernel(PMat);
       if(length(Kernel)!=0){
          Vs = Kernel[0][0];
          AP = 0;
          for(I = 0 ; I < L ; I++)AP = AP+Vs[I]*Monomials[I];
          if(AP!=0)break;
       }
-
    }
    Bs = [];
    for(J = 0 ; J < K ; J++){
