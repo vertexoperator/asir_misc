@@ -192,25 +192,16 @@ def homogeneousInvariants(IG , RM , Xs , D){
 step(5)(6)(7) of Algorithm 6.1 (Computation of a localization of an invariant ring)
 */
 def rationalInvariants(IY , Ys , IX , Xs , Ord){
-    /* step(5)(6) */
-    MG = IY;
-    RG = ltov(MG);   /* reduced Grobner bassis @ K(X)[y_1, ... y_n] */
-    for(I = 0 ; I < length(MG) ; I++){
-       FPol = MG[I];
-       RG[I] = 0;
-       FPol = p_nf(MG[I] , vtol(RG) , Ys , Ord);
-       FPol = p_nf(FPol , IX , Xs , 0); /* IX should be Grobner basis */
-       RG[I] = FPol;
-    }
-    /* step(7) */
     Ret = [];
-    for(I = 0 ; I < length(RG) ; I++){
-       F = RG[I];
+    CurOrd = dp_ord();
+    dp_ord(Ord);
+    for(RG = nd_gr_trace(IY , Ys , 1 , 1 , Ord) ; RG!=[] ; RG=cdr(RG)){
+       F = p_nf(car(RG) , IX , Xs , 0);   /* IX should be Groebner basis */
        if(F==0)continue;
-       F_terms = p_terms(F , Ys , Ord);
-       LC_F = monocoef(F , F_terms[0] , Ys);
-       for(J = 0 ; J <length(F_terms) ; J++){
-          C_F = monocoef(F , F_terms[J] , Ys);
+       V = dp_ptod(F , Ys);
+       LC_F = dp_hc(V);
+       for(V=dp_rest(V) ; V ; V=dp_rest(V)){
+          C_F = dp_hc(V);
           Q = red(C_F/LC_F);
           if(length(vars(Q))==0)continue;
           Check = 0;
@@ -226,8 +217,10 @@ def rationalInvariants(IY , Ys , IX , Xs , Ord){
           }
        }
     }
+    dp_ord(CurOrd);
     return Ret;
 }
+
 
 
 /*
