@@ -1,35 +1,3 @@
-/*
-partial implementation of algorithms described in
-
-"Using Extended Derksen Ideals in Computational Invariant Theory"
-http://arxiv.org/abs/1310.6851
-
-algorithm 6.1/7.1/7.2 is implemented.
-
-examples:
-
-linvar([x*y-1] , newmat(3,3,[[x,0,0],[0,x^2,0],[0,0,y]]),[t1,t2,t3]);
-
-linvar([c*c+s*s-1] , newmat(2,2,[[c,s],[-s,c]]) , [x,y]);
-
-linvar([c*c+s*s-1] , newmat(4,4,[[c,s,0,0],[-s,c,0,0],[0,0,c,s],[0,0,-s,c]]) , [q1,q2,p1,p2]);
-
-linvar([c*c+s*s-1] ,
-        newmat(7,7,[[c,s,0,0,0,0,a],
-                    [-s,c,0,0,0,0,b],
-                    [0,0,c,s,0,0,a],
-                    [0,0,-s,c,0,0,b],
-                    [0,0,0,0,c,s,a],
-                    [0,0,0,0,-s,c,b],
-                    [0,0,0,0,0,0,1]]) ,
-        [x1,y1,x2,y2,x3,y3,z]);
-
-
-linvar([a*d-b*c-1] , newmat(3,3,[[a^2 , 2*a*b , b^2],[a*c , a*d+b*c , b*d],[c^2 ,2*c*d ,d^2]]) , [x,y,z]);
-
-
-
-*/
 load("noro_pd.rr");
 load("noro_matrix.rr");
 
@@ -197,13 +165,19 @@ def homogeneousInvariants(IG , RM , Xs , D){
 
 /*
 step(5)(6)(7) of Algorithm 6.1 (Computation of a localization of an invariant ring)
+
+IX:代数群が作用する空間の定義イデアル
+Xs:代数群が作用する空間の座標変数
+IG:代数群の座標環の定義イデアル
+Zs:代数群の座標環の変数
+GMaps:代数群の作用を表す多項式
 */
-def rationalInvariants(IY , Ys , IX , Xs , Ord){
+def rationalInvariants(GX , Xs , GY , Ys , Ord){
     Ret = [];
     CurOrd = dp_ord();
-    dp_ord(Ord);
-    for(RG = nd_gr_trace(IY , Ys , 1 , 1 , Ord) ; RG!=[] ; RG=cdr(RG)){
-       F = p_nf(car(RG) , IX , Xs , 0);   /* IX should be Groebner basis */
+    dp_ord(Ord);   /* to get leading coefficient */
+    for(RG = nd_gr_trace(GY , Ys , 1 , 1 , Ord) ; RG!=[] ; RG=cdr(RG)){
+       F = p_nf(car(RG) , GX , Xs , 0); /* GX should be Groebner bases */
        if(F==0)continue;
        V = dp_ptod(F , Ys);
        LC_F = dp_hc(V);
@@ -230,132 +204,105 @@ def rationalInvariants(IY , Ys , IX , Xs , Ord){
 
 
 /*
-algorithm6.1
-
-IX:代数群が作用する空間の定義イデアル
-Xs:代数群が作用する空間の座標変数
-IG:代数群の座標環の定義イデアル
-Zs:代数群の座標環の変数
-GReps:代数群の作用を表す多項式
+implementation of algorithm 6.1 and algorithm 7.1
 */
-def localizedInvariants(IX , Xs , IG , Zs , GReps){
-   N = length(Xs);
-   /* step(1) is omitted */
-   /* step(2) */
-   Ys = [];
-   GG = nd_gr(IG , Zs , 0 , 0);
-   Ehat = append(IX , GG);
-   for(I = 0 ; I < N ; I++){
-     YI = uc();
-     Ys = cons(YI , Ys);
-     Ehat = cons(YI - GReps[I] , Ehat);
-   }
-   /* step(3) */
-   AllVars = append(Zs , append(Ys, Xs));
-   Ghat = nd_gr_trace(Ehat , AllVars , 1 , 1 , [[0,length(Zs)],[0,length(Ys)],[0,length(Xs)]]);
-   G = noro_pd.elimination(Ghat , append(Xs , Ys));
-   Gx = noro_pd.elimination(Ghat , Xs);
-   Gy = diffset(G , Gx);
-   /* step(4) is skipped and proceed step(5)(6)(7) */
-   QI = rationalInvariants(Gy , Ys , Gx , Xs , 0);
-   QRats = [];
-   QPols = [];
-   for(I=0;I<length(QI);I++){
-      if(length(vars(dn(QI[I])))!=0){
-         QRats = cons(QI[I] , QRats);
-      }else{
-         QPols = cons(QI[I] , QPols);
-      }
-   }
-   if(QRats==[]){
-      return [1,QPols];
-   }
-   Hs = map(dn , QRats);
-   Fs = map(nm , QRats);
-   /* step(8)(9)(10) */
-   Monomials = [];
-   K = length(QRats);
-   for(R = 0 ;; R++){
-      for(C=gen_monomials(R , Xs) ; C!=[] ; C=cdr(C)){
-         Check = 0;
-         for(Ms = Monomials ; Ms!=[] ; Ms=cdr(Ms)){
-            if(p_nf(car(Ms)-car(C) , Gx , Xs , 0)==0){
-               Check=1;
-               break;
-            }
-         }
-         if(Check==0)Monomials = cons(car(C) , Monomials);
-      }
-      L = length(Monomials);
-      NF_fm = newmat(L,K);
-      NF_hm = newmat(L,K);
-      NF_G = [];
-      for(I = 0 ; I < L ; I++){
-         P = msubst(Monomials[I] , Xs , GReps) - Monomials[I];
-         P = p_nf(P , Gx , Xs , 0);
-         P = p_nf(P , GG , Zs , 0);
-         NF_G = cons(P , NF_G);
-         for(J = 0 ; J < K ; J++){
-            NF_fm[I][J] = p_nf(Fs[J]*Monomials[I] , Gx , Xs , 0);
-            NF_hm[I][J] = p_nf(Hs[J]*Monomials[I] , Gx , Xs , 0);
-         }
-      }
-      NF_G = reverse(NF_G);
-      /* solve equations in step(9) */
-      PMat = newmat(K+1 , L*(K+1));
-      for(J = 0 ; J < K ; J++){
-          for(I = 0 ; I < L ; I++){
-              PMat[J][I] = NF_fm[I][J];
-          }
-          for(JI = 0 ; JI < L ; JI++){
-             for(JJ = 0 ; JJ < K ; JJ++){
-                if(J==JJ)PMat[J][L+JI*K+JJ] = NF_hm[JI][JJ];
-             }
-          }
-          for(I = 0 ; I < L ; I++){
-             PMat[K][I] = NF_G[I];
-          }
-      }
-      Kernel = p_compute_kernel(PMat);
-      if(length(Kernel)!=0){
-         Vs = Kernel[0][0];
-         AP = 0;
-         for(I = 0 ; I < L ; I++)AP = AP+Vs[I]*Monomials[I];
-         if(AP!=0)break;
-      }
-   }
-   Bs = [];
-   for(J = 0 ; J < K ; J++){
-      BP = 0;
-      for(I = 0 ; I < L ; I++){
-          BP = BP+Vs[L+I*K+J]*Monomials[I];
-      }
-      if(BP!=0)Bs = cons(BP , Bs);
-   }
-   Bs = union(QPols , Bs);
-   Check = 0;
-   for(I = 0 ; I < length(Bs) ; I++){
-      if( length(vars(red(Bs[I]/AP)))==0 ){Check=1;break;}
-   }
-   if(Check==0){Bs=cons(AP,Bs);}
-   return [AP,Bs];
-}
-
-
 def linvar(IG , RM , Xs){
-   GVars = append(vars(IG) , vars(RM));
+   Zs = append(vars(IG) , vars(RM));
    NM = size(RM);
-   Ts = [];
+   GMaps = [];
    for(I = 0 ; I < length(Xs) ; I++){
       NP = 0;
       for(J = 0 ; J < length(Xs) ; J++){
           NP = NP + RM[I][J]*Xs[J];
       }
-      Ts = cons(NP , Ts);
+      GMaps = cons(NP , GMaps);
    }
-   AB = localizedInvariants([] , Xs , IG , GVars , reverse(Ts));
-   AP = AB[0];
-   BPols = AB[1];
+   GMaps = reverse(GMaps);
+   /* start algorithm 6.1 */
+   IX = [];
+   /* step(1) is omitted */
+   /* step(2) */
+   Ys = [];
+   GG = nd_gr(IG , Zs , 0 , 0);
+   Ehat = append(IX , GG);
+   for(I = 0 ; I < length(Xs) ; I++){
+     YI = uc();
+     Ys = cons(YI , Ys);
+     Ehat = cons(YI - GMaps[I] , Ehat);
+   }
+   /* step(3) */
+   AllVars = append(Zs , append(Ys, Xs));
+   Ghat = nd_gr_trace(Ehat , AllVars , 1 , 1 , [[0,length(Zs)],[0,length(Ys)],[0,length(Xs)]]);
+   G = noro_pd.elimination(Ghat , append(Xs , Ys));
+   GX = noro_pd.elimination(Ghat , Xs);
+   GY = diffset(G , GX);
+   /* step(4) is skipped and proceed step(5)(6)(7) */
+   QExprs = rationalInvariants(GX , Xs , GY , Ys , 0);
+   QRats = [];
+   QPols = [];
+   for( ;QExprs!=[] ; QExprs=cdr(QExprs)){
+      QExpr = car(QExprs);
+      if(length(vars(dn(QExpr)))!=0){
+         QRats = cons(QExpr , QRats);
+      }else{
+         QPols = cons(QExpr , QPols);
+      }
+   }
+   /* algorithm 6.1 step(8)(9)(10) */
+   if(QRats==[]){
+      AP = 1;
+      BPols = QPols;
+   }else{
+      K =length(QRats);
+      Hs = map(dn , QRats);
+      Fs = map(nm , QRats);
+      InvPols = [];
+      for(R = 1 ;; R++){
+         InvPols = append(homogeneousInvariants(IG , RM , Xs , R) , InvPols);
+         L = length(InvPols);
+         NF_fm = newmat(L,K);
+         NF_hm = newmat(L,K);
+         for(I = 0 ; I < L ; I++){
+            for(J = 0 ; J < K ; J++){
+               NF_fm[I][J] = p_nf(Fs[J]*InvPols[I] , GX , Xs , 0);
+               NF_hm[I][J] = p_nf(Hs[J]*InvPols[I] , GX , Xs , 0);
+            }
+         }
+         /* solve equations in step(9) */
+         PMat = newmat(K , L*(K+1));
+         for(J = 0 ; J < K ; J++){
+             for(I = 0 ; I < L ; I++){
+                 PMat[J][I] = NF_fm[I][J];
+             }
+             for(JI = 0 ; JI < L ; JI++){
+                for(JJ = 0 ; JJ < K ; JJ++){
+                   if(J==JJ)PMat[J][L+JI*K+JJ] = NF_hm[JI][JJ];
+                }
+             }
+         }
+         Kernel = p_compute_kernel(PMat);
+         if(length(Kernel)!=0){
+            Vs = Kernel[0][0];
+            AP = 0;
+            for(I = 0 ; I < L ; I++)AP = AP+Vs[I]*InvPols[I];
+            if(AP!=0)break;
+         }
+      }
+      BPols = [];
+      for(J = 0 ; J < K ; J++){
+         BP = 0;
+         for(I = 0 ; I < L ; I++){
+             BP = BP+Vs[L+I*K+J]*InvPols[I];
+         }
+         if(BP!=0)BPols = cons(BP , BPols);
+      }
+      BPols = union(QPols , BPols);
+      Check = 0;
+      for(I = 0 ; I < length(BPols) ; I++){
+         if( length(vars(red(BPols[I]/AP)))==0 ){Check=1;break;}
+      }
+      if(Check==0){BPols=cons(AP,BPols);}
+   }
    /* start algorithm 7.1 */
    Ret = [];
    for(Deg = 1 ; ; Deg++){
@@ -368,14 +315,14 @@ def linvar(IG , RM , Xs){
       /* algorithm7.1 step(2) */
       Jhat = nd_gr(G , append(Xs , vtol(Ys)) , 0 , [[0,length(Xs)],[0,length(Ys)]]);
       J = noro_pd.elimination(Jhat , vtol(Ys));
-      Check1 = 1;  /* $B \subset A$? */
-      Check2 = 0;  /* $K[X] \dot a \cap A= A \dot a$? */
+      Check1 = 1; /* $B \subset A$? */
+      Check2 = 0; /* $K[X] \dot a \cap A= A \dot a$? */
       /* Check B \subset A */
-      /* 
+      /*
          algorithm for subring contaiment:
          * subroutine 2.5.4 in "Algorithms in Invariant Theory" by Sturmfels
-         * subroutine 2.5 in 
-         "Efficient computation offundamental invariants - An approach using Buchberger's Grobner bases method" 
+         * subroutine 2.5 in
+         "Efficient computation offundamental invariants - An approach using Buchberger's Grobner bases method"
          (Sturmfels and White)
       */
       for(I = 0 ; I < length(BPols) ; I++){
