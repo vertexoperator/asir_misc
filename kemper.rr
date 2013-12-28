@@ -269,38 +269,37 @@ def linvar(IG , RM , Xs){
       Hs = map(dn , QRats);
       Fs = map(nm , QRats);
       InvPols = [];
-      L = 0;
       for(R = 1 ;; R++){
          InvPols = append(homogeneousInvariants(IG , RM , Xs , R) , InvPols);
-         if(length(InvPols)==L)continue;
-         L = length(InvPols);
          /* solve equations in step(9) */
-         PMat = newmat(K , L*(K+1));
-         for(J = 0 ; J < K ; J++){
-             for(I = 0 ; I < L ; I++){
-                 PMat[J][I] = p_nf(Fs[J]*InvPols[I] , GX , Xs , 0);
-             }
-             for(JI = 0 ; JI < L ; JI++){
-                for(JJ = 0 ; JJ < K ; JJ++){
-                   if(J==JJ)PMat[J][L+JI*K+JJ] = p_nf(Hs[JJ]*InvPols[JI] , GX , Xs , 0);
-                }
-             }
+         Bases = ltov(InvPols);
+         for(J = 1; J < K ; J++){
+              L = length(Bases);
+              PMat = newvect(L+length(InvPols));
+              for(I = 0 ; I < L ; I++){
+                 PMat[I] = p_nf(Fs[J]*Bases[I] , GX , Xs , 0);
+              }
+              for(I = 0 ; I < length(InvPols) ; I++){
+                 PMat[I+L] = p_nf(Hs[J]*InvPols[I] , GX , Xs , 0);
+              }
+              NewBases = [];
+              for(Kernel = p_compute_kernel(matr(PMat)) ; Kernel!=[] ; Kernel=cdr(Kernel)){
+                 V = car(Kernel)[0];
+                 Pol = 0;
+                 for(I = 0 ; I <L ; I++)Pol=Pol+V[I]*Bases[I];
+                 if(Pol!=0)NewBases = cons(Pol , NewBases);
+              }
+              Bases = ltov(NewBases);
+              if(length(Bases)==0)break;
          }
-         Kernel = p_compute_kernel(PMat);
-         if(length(Kernel)!=0){
-            Vs = Kernel[0][0];
-            AP = 0;
-            for(I = 0 ; I < L ; I++)AP = AP+Vs[I]*InvPols[I];
-            if(AP!=0)break;
+         if(length(Bases)>0){
+             AP = Bases[0];
+             break;
          }
       }
       BPols = [];
       for(J = 0 ; J < K ; J++){
-         BP = 0;
-         for(I = 0 ; I < L ; I++){
-             BP = BP+Vs[L+I*K+J]*InvPols[I];
-         }
-         if(BP!=0)BPols = cons(BP , BPols);
+         BPols = cons(red(AP*Fs[J]/Hs[J]) , BPols);
       }
       BPols = union(QPols , BPols);
       Check = 0;
