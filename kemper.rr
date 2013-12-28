@@ -28,7 +28,6 @@ linvar([c*c+s*s-1] ,
 linvar([a*d-b*c-1] , newmat(3,3,[[a^2 , 2*a*b , b^2],[a*c , a*d+b*c , b*d],[c^2 ,2*c*d ,d^2]]) , [x,y,z]);
 
 */
-
 load("noro_pd.rr");
 load("noro_matrix.rr");
 
@@ -168,12 +167,7 @@ def homogeneousInvariants(IG , RM , Xs , D){
     G = nd_gr(IG , GVars , 0 , 0);
     Monomials = gen_monomials(D , Xs);
     HPols = [];
-    Ys = newvect(length(Xs));
-    for(I = 0 ; I < length(Xs) ; I++){
-       for(J = 0 ; J < length(Xs) ; J++){
-          Ys[I] += RM[I][J]*Xs[J];
-       }
-    }
+    Ys = RM*ltov(Xs);
     for(C = Monomials ; C!=[] ; C=cdr(C)){
         P = car(C);
         Q = msubst(P , Xs , Ys) - P;
@@ -239,16 +233,7 @@ implementation of algorithm 6.1 and algorithm 7.1
 */
 def linvar(IG , RM , Xs){
    Zs = append(vars(IG) , vars(RM));
-   NM = size(RM);
-   GMaps = [];
-   for(I = 0 ; I < length(Xs) ; I++){
-      NP = 0;
-      for(J = 0 ; J < length(Xs) ; J++){
-          NP = NP + RM[I][J]*Xs[J];
-      }
-      GMaps = cons(NP , GMaps);
-   }
-   GMaps = reverse(GMaps);
+   GMaps = RM*ltov(Xs);
    /* start algorithm 6.1 */
    IX = [];
    /* step(1) is omitted */
