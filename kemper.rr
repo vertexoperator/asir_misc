@@ -288,8 +288,10 @@ def linvar(IG , RM , Xs){
       Hs = map(dn , QRats);
       Fs = map(nm , QRats);
       InvPols = [];
+      L = 0;
       for(R = 1 ;; R++){
          InvPols = append(homogeneousInvariants(IG , RM , Xs , R) , InvPols);
+         if(length(InvPols)==L)continue;
          L = length(InvPols);
          NF_fm = newmat(L,K);
          NF_hm = newmat(L,K);
