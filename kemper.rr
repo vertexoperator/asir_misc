@@ -177,7 +177,7 @@ def homogeneousInvariants(IG , RM , Xs , D){
     Ret = [];
     for(I = 0 ; I < length(Kernel) ; I++){
        P = Kernel[I][0]*matc(ltov(Monomials));
-       if (P[0]!=0])Ret = cons(P[0] , Ret);
+       if (P[0]!=0)Ret = cons(P[0] , Ret);
     }
     return Ret;
 }
