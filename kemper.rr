@@ -276,21 +276,15 @@ def linvar(IG , RM , Xs){
          L = length(InvPols);
          NF_fm = newmat(L,K);
          NF_hm = newmat(L,K);
-         for(I = 0 ; I < L ; I++){
-            for(J = 0 ; J < K ; J++){
-               NF_fm[I][J] = p_nf(Fs[J]*InvPols[I] , GX , Xs , 0);
-               NF_hm[I][J] = p_nf(Hs[J]*InvPols[I] , GX , Xs , 0);
-            }
-         }
          /* solve equations in step(9) */
          PMat = newmat(K , L*(K+1));
          for(J = 0 ; J < K ; J++){
              for(I = 0 ; I < L ; I++){
-                 PMat[J][I] = NF_fm[I][J];
+                 PMat[J][I] = p_nf(Fs[J]*InvPols[I] , GX , Xs , 0);
              }
              for(JI = 0 ; JI < L ; JI++){
                 for(JJ = 0 ; JJ < K ; JJ++){
-                   if(J==JJ)PMat[J][L+JI*K+JJ] = NF_hm[JI][JJ];
+                   if(J==JJ)PMat[J][L+JI*K+JJ] = p_nf(Hs[JJ]*InvPols[JI] , GX , Xs , 0);
                 }
              }
          }
