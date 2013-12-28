@@ -274,8 +274,6 @@ def linvar(IG , RM , Xs){
          InvPols = append(homogeneousInvariants(IG , RM , Xs , R) , InvPols);
          if(length(InvPols)==L)continue;
          L = length(InvPols);
-         NF_fm = newmat(L,K);
-         NF_hm = newmat(L,K);
          /* solve equations in step(9) */
          PMat = newmat(K , L*(K+1));
          for(J = 0 ; J < K ; J++){
