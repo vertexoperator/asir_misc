@@ -299,7 +299,7 @@ def linvar(IG , RM , Xs){
          InvPols = append(homogeneousInvariants(IG , RM , Xs , R) , InvPols);
          /* solve equations in step(9) */
          Bases = ltov(InvPols);
-         for(J = 1; J < K ; J++){
+         for(J = 0; J < K ; J++){
               L = length(Bases);
               PMat = newvect(L+length(InvPols));
               for(I = 0 ; I < L ; I++){
@@ -386,5 +386,69 @@ def linvar(IG , RM , Xs){
          }
       }
    }
+}
+
+
+/* ==================================== */
+/* simple test code for linvar */
+
+def rngeq(R1 , R2){
+   Ys = [];
+   G = [];
+   for(I = 0 ; I < length(R1) ; I++)Ys=cons(uc() , Ys);
+   for(I = 0 ; I < length(R1) ; I++)G=cons(Ys[I]-R1[I] , G);
+   G = nd_gr(G , append(vars(R1) , Ys) , 0 , [[0,length(vars(R1))],[0,length(R1)]]);
+   for(J = 0 ; J < length(R2) ; J++){
+      P = p_nf(R2[J] , G , append(vars(R1) , Ys) , 0);
+      if(intersect(vars(P) , vars(R1))!=[])return 0;
+   }
+   G = [];
+   Ys = [];
+   for(I = 0 ; I < length(R2) ; I++)Ys=cons(uc() , Ys);
+   for(I = 0 ; I < length(R2) ; I++)G=cons(Ys[I]-R2[I] , G);
+   G = nd_gr(G , append(vars(R2) , Ys) , 0 , [[0,length(vars(R2))],[0,length(R2)]]);
+   for(J = 0 ; J < length(R1) ; J++){
+      P = p_nf(R1[J] , G , append(vars(R2) , Ys) , 0);
+      if(intersect(vars(P) , vars(R2))!=[])return 0;
+   }
+   return 1;
+}
+
+def test_linvar(){
+   /* 3-dimensional irrep of SL(3) */
+   R1 = linvar ([a*d-b*c-1] , newmat(3,3,[[a^2 , 2*a*b , b^2],[a*c , a*d+b*c , b*d],[c^2 ,2*c*d ,d^2]]) , [x,y,z]);
+   R2 = [-z*x+y^2];
+   print("3-dimensional irrep of SL(3):");
+   if(!rngeq(R1,R2)){print("failed");}else{print("OK");}
+
+   /* natural rep of SO(2) */
+   R1 = linvar([c*c+s*s-1] , newmat(2,2,[[c,s],[-s,c]]) , [x,y]);
+   R2 = [x^2+y^2];
+   print("natural rep. of SO(2):");
+   if(!rngeq(R1,R2)){print("failed");}else{print("OK");}
+
+   /* 4-dim rep. of SO(2) */
+   R1 = linvar([c*c+s*s-1] , newmat(4,4,[[c,s,0,0],[-s,c,0,0],[0,0,c,s],[0,0,-s,c]]) , [q1,q2,p1,p2]);
+   R2 = [q1^2+q2^2,p1^2+p2^2,-p2*q1+p1*q2,p1*q1+p2*q2];
+   print("4-dim rep. of SO(2):");
+   if(!rngeq(R1,R2)){print("failed");}else{print("OK");}
+
+   /* 3-dim rep. of GL(1) */
+   R1 = linvar([x*y-1] , newmat(3,3,[[x,0,0],[0,x^2,0],[0,0,y]]),[t1,t2,t3]);
+   R2 = [t3^2*t2,t3*t1];
+   print("3-dim rep. of GL(1):");
+   if(!rngeq(R1,R2)){print("failed");}else{print("OK");}
+
+   /* 5-dim rep. of SL(2) from arXiv:0807.3476 Proposition5.1 */
+   M = newmat(5,5,[[a^2,2*a*b,b^2,0,0],
+                    [a*c,a*d+b*c,b*d,0,0],
+                    [c^2,2*c*d,d^2,0,0],
+                    [0,0,0,a,b],
+                    [0,0,0,c,d]]);
+   R1 = linvar([a*d-b*c-1] , M , [a0,a1,a2,x1,x2]);
+   R2 = [x2^2*a0-2*x2*x1*a1+x1^2*a2,-a2*a0+a1^2];
+   print("5-dim rep. of SL(2):");
+   if(!rngeq(R1,R2)){print("failed");}else{print("OK");}
+
 }
 
