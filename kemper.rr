@@ -64,6 +64,27 @@ def diffset(Ls , Rs){
    return Ret;
 }
 
+def tdeg(F , Xs){
+   Ret = 0;
+   for(V = dp_ptod(F,Xs) ; V ; V = dp_rest(V)){
+      D = 0;
+      for(I = 0 ; I < length(Xs) ; I++){
+         D = D + deg(dp_dtop(dp_ht(V) , Xs) , Xs[I]);
+      }
+      if(D > Ret)Ret=D;
+   }
+   return Ret;
+}
+
+def max(Ls){
+   V = 0;
+   for(Ls=Ls ; Ls!=[] ; Ls=cdr(Ls)){
+      if(car(Ls) > V)V=car(Ls);
+   }
+   return V;
+}
+
+
 /*
 多項式P中の単項式Mの係数を計算する
 monocoef(y^3+x^3*y^2+2*x*y^2+2*x*y , x*y^2 , [x,y]);
@@ -162,7 +183,7 @@ return [-z*x+y^2];
 
 */
 def homogeneousInvariants(IG , RM , Xs , D){
-    GVars = append(vars(IG) , vars(RM));
+    GVars = union(vars(IG) , vars(RM));
     AllVars = append(Xs , GVars);
     G = nd_gr(IG , GVars , 0 , 0);
     Monomials = gen_monomials(D , Xs);
