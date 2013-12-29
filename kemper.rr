@@ -120,20 +120,19 @@ msubst(t1 , [t1,t2,t3,t4],[t1*x^5,t2*x^3,t3*y^2,t4*y^4]);
 
 */
 def msubst(P , Vars , Exprs){
-   N = length(Vars);
    TV = [];
    TP = P;
-   for(I = 0 ; I < N ; I++){
+   for(V = Vars ; V!=[] ; V=cdr(V)){
       NV = uc();
       TV = cons(NV , TV);
-      TP = subst(TP , Vars[I] , NV);
+      TP = subst(TP , car(V) , NV);
    }
-   TV=reverse(TV);
-   for(I = 0 ; I < N ; I++){
-      TP = subst(TP , TV[I] , Exprs[I]);
+   for(V=reverse(TV) , I = 0 ; V!=[] ; V=cdr(V),I++){
+      TP = subst(TP , car(V) , Exprs[I]);
    }
    return TP;
 }
+
 
 /*
 多項式係数の行列の定数係数のKernelを計算する
