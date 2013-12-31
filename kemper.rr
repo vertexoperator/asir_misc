@@ -394,10 +394,10 @@ def rngeq(R1 , R2){
 }
 
 def test_linvar(){
-   /* 3-dimensional irrep of SL(3) */
+   /* 3-dimensional irrep of SL(2) */
    R1 = linvar ([a*d-b*c-1] , newmat(3,3,[[a^2 , 2*a*b , b^2],[a*c , a*d+b*c , b*d],[c^2 ,2*c*d ,d^2]]) , [x,y,z]);
    R2 = [-z*x+y^2];
-   print("3-dimensional irrep of SL(3):");
+   print("3-dimensional irrep of SL(2):");
    if(!rngeq(R1,R2)){print("failed");}else{print("OK");}
 
    /* natural rep of SO(2) */
