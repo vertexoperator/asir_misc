@@ -317,12 +317,11 @@ def linvar(IG , RM , Xs){
    /* start algorithm 7.1 */
    Ret = [];
    for(Deg = 1 ; ; Deg++){
-      G = [];
-      Ys = newvect(length(Ret));
-      for(I = 0 ; I < length(Ret) ; I++)Ys[I] = uc();
-      G = vtol(ltov(Ret) - Ys);
-      /* algorithm7.1 step(2) */
-      Jhat = nd_gr(G , append(Xs , vtol(Ys)) , 0 , [[0,length(Xs)],[0,length(Ys)]]);
+      if(Deg==1){
+         Ys = newvect(length(Ret));
+         for(I = 0 ; I < length(Ret) ; I++)Ys[I] = uc();
+         Jhat = nd_gr(vtol(Ys - ltov(Ret)) , append(Xs , vtol(Ys)) , 0 , [[0,length(Xs)],[0,length(Ys)]]);
+      }
       J = noro_pd.elimination(Jhat , vtol(Ys));
       Check1 = 1; /* $B \subset A$? */
       Check2 = 0; /* $K[X] \dot a \cap A= A \dot a$? */
