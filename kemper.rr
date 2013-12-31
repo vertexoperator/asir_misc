@@ -343,7 +343,7 @@ def linvar(IG , RM , Xs){
          Check2 = Check1;
       }else if(Check1==1){
          Check2 = 1;
-         for(Hs = J ; Hs!=[] ; Hs=cdr(Hs)){
+         for(Hs = noro_pd.elimination(Jhat , vtol(Ys)) ; Hs!=[] ; Hs=cdr(Hs)){
              HPol = red(msubst(car(Hs) , vtol(Ys) , Ret)/AP);
              if(dn(HPol)!=1){Check2=0;break;}
              QPol = p_nf(HPol , Jhat , append(Xs , vtol(Ys)) , 0);
