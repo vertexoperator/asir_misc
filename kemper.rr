@@ -116,9 +116,7 @@ def msubst(P , Vars , Exprs){
 }
 
 
-/*
-多項式係数の行列の定数係数のKernelを計算する
-*/
+/*  多項式係数の行列の定数係数のKernelを計算する  */
 def p_compute_kernel(PMat){
    Sz = size(PMat);
    Vars = vars(PMat);
@@ -146,9 +144,7 @@ def p_compute_kernel(PMat){
    return linalg.compute_kernel(CMat);
 }
 
-/*
-computing Lie algebra of an algebraic group
-*/
+/*  computing Lie algebra of an algebraic group  */
 def liealg(RM,IG){
   G = IG;
   for(I = 0 ; I < size(RM)[0] ; I++){
@@ -160,8 +156,7 @@ def liealg(RM,IG){
         }
      }
   }
-  GVars = vars(RM);
-  for(G=primadec( G ,GVars ) ; G!=[] ; G=cdr(G)){
+  for(G=primadec( G ,vars(RM) ) ; G!=[] ; G=cdr(G)){
      for(K=car(G) ; K!=[] ; K=cdr(K)){
         Ret = [];
         Vars = [];
@@ -173,7 +168,7 @@ def liealg(RM,IG){
         }
         Eps = uc();
         VBasis = newvect(length(Vars));
-        for(I = 0 ; I < length(Vars) ; I++)VBasis[I] = strtov("e"+rtostr(I));
+        for(I = 0 ; I < length(Vars) ; I++)VBasis[I] = uc();
         SMat = newmat(length(IG) , length(Vars));
         for(I = 0 , Gs = IG ; Gs!=[] ; Gs=cdr(Gs) , I++){
            P = coef(msubst(car(Gs),Vars,vtol(ltov(Values)+Eps*VBasis)) , 1 , Eps);
