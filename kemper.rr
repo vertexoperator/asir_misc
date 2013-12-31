@@ -8,8 +8,10 @@ algorithm 6.1/7.1/7.2 is implementedi now.
 see test code for examples.
 */
 load("gr");
+load("primdec");
 load("noro_pd.rr");
 load("noro_matrix.rr");
+
 
 def memq(Obj , Ls){
   for(C=Ls;C!=[];C=cdr(C)){
@@ -143,6 +145,57 @@ def p_compute_kernel(PMat){
    }
    return linalg.compute_kernel(CMat);
 }
+
+/*
+computing Lie algebra of an algebraic group
+*/
+def liealg(RM,IG){
+  G = IG;
+  for(I = 0 ; I < size(RM)[0] ; I++){
+     for(J = 0 ; J < size(RM)[1] ; J++){
+        if(I==J){
+           G=cons(RM[I][J]-1 , G);
+        }else if(RM[I][J]!=0){
+           G = cons(RM[I][J] , G);
+        }
+     }
+  }
+  GVars = vars(RM);
+  for(G=primadec( G ,GVars ) ; G!=[] ; G=cdr(G)){
+     for(K=car(G) ; K!=[] ; K=cdr(K)){
+        Ret = [];
+        Vars = [];
+        Values = [];
+        for(S=car(K) ; S!=[] ; S=cdr(S)){
+           Var = vars(car(S))[0];
+           Vars = cons(Var , Vars);
+           Values = cons(-coef(car(S) , 0 , Var)/coef(car(S) , 1 , Var) , Values);
+        }
+        Eps = uc();
+        VBasis = newvect(length(Vars));
+        for(I = 0 ; I < length(Vars) ; I++)VBasis[I] = strtov("e"+rtostr(I));
+        SMat = newmat(length(IG) , length(Vars));
+        for(I = 0 , Gs = IG ; Gs!=[] ; Gs=cdr(Gs) , I++){
+           P = coef(msubst(car(Gs),Vars,vtol(ltov(Values)+Eps*VBasis)) , 1 , Eps);
+           for(J = 0 ; J < length(Vars) ; J++)SMat[I][J] = coef(P , 1 , VBasis[J]);
+        }
+        for(Kernel=linalg.compute_kernel(SMat) ; Kernel!=[] ; Kernel=cdr(Kernel)){
+           Vec = car(Kernel)[0];
+           TM = msubst(RM,Vars,vtol(ltov(Values)+Eps*VBasis));
+           LM = newmat(size(TM)[0] , size(TM)[1]);
+           for(I = 0 ; I < size(TM)[0] ; I++){
+              for(J = 0 ; J < size(TM)[1] ; J++){
+                 LM[I][J] = coef(TM[I][J] , 1 , Eps);
+              }
+           }
+           LM = msubst(LM , vtol(VBasis) , vtol(Vec));
+           Ret = cons(LM , Ret);
+        }
+        return Ret;
+     }
+  }
+}
+
 
 
 /*
