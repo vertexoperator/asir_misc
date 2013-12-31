@@ -322,7 +322,6 @@ def linvar(IG , RM , Xs){
          for(I = 0 ; I < length(Ret) ; I++)Ys[I] = uc();
          Jhat = nd_gr(vtol(Ys - ltov(Ret)) , append(Xs , vtol(Ys)) , 0 , [[0,length(Xs)],[0,length(Ys)]]);
       }
-      J = noro_pd.elimination(Jhat , vtol(Ys));
       Check1 = 1; /* $B \subset A$? */
       Check2 = 0; /* $K[X] \dot a \cap A= A \dot a$? */
       /* Check B \subset A */
@@ -362,8 +361,7 @@ def linvar(IG , RM , Xs){
             Ret = reverse(cons(car(S), Ret));
             NewY = uc();
             Ys = ltov(reverse(cons(NewY , vtol(Ys))));
-            G = cons(car(S) - NewY , Jhat);
-            Jhat = nd_gr(cons(car(S),Jhat) , append(Xs , vtol(Ys)) , 0 , [[0,length(Xs)],[0,length(Ys)]]);
+            Jhat = nd_gr(cons(car(S)-NewY,Jhat) , append(Xs , vtol(Ys)) , 0 , [[0,length(Xs)],[0,length(Ys)]]);
          }
       }
    }
