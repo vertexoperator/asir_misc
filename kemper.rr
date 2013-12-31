@@ -363,6 +363,7 @@ def linvar(IG , RM , Xs){
          SPol = p_nf(car(S) , Jhat , append(Xs , vtol(Ys)) , 0);
          if( intersect(vars(SPol) , Xs)!=[] ){
             Ret = cons(car(S), Ret);
+            Jhat = nd_gr(cons(car(S),Jhat) , append(Xs , vtol(Ys)) , 0 , [[0,length(Xs)],[0,length(Ys)]]);
          }
       }
    }
@@ -445,6 +446,19 @@ def test_linvar(){
    print("7-dim rep. of ISO(2):");
    if(!rngeq(R1,R2)){print("failed");}else{print("OK");}
 
+   /* 6-dim rep. of O(2) x {+1,-1} */
+   /* example5.9.1(p.229) of 'computational invariant theory'(Derksen/Kemper) */
+   R1 = linvar([z1^2-1 , z2^2-1 , z3^2+z4^2-1],
+        newmat(6,6,[[1,0,0,0,0,0],
+                    [0,z3^2,z4^2,0,0,2*z3*z4],
+                    [0,z4^2,z3^2,0,0,-2*z3*z4],
+                    [0,0,0,z1*z2*z3,z1*z2*z4,0],
+                    [0,0,0,-z1*z4,z1*z3,0],
+                    [0,-z2*z3*z4,z2*z3*z4,0,0,z2-2*z2*z4^2]]),
+         [sx,sy,sz,t_yx,t_zx,t_yz]);
+   R2 = [sx , sy+sz , t_yx^2+t_zx^2 , sz*sy-t_yz^2 , t_zx^2*sy+t_yx^2*sz-2*t_yz*t_zx*t_yx];
+   print("6-dim rep of O(2) x {+1,-1}:");
+   if(!rngeq(R1,R2)){print("failed");}else{print("OK");}
 
 }
 
