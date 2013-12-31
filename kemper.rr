@@ -319,10 +319,8 @@ def linvar(IG , RM , Xs){
    for(Deg = 1 ; ; Deg++){
       G = [];
       Ys = newvect(length(Ret));
-      for(I = 0 ; I < length(Ret) ; I++){
-         Ys[I] = uc();
-         G = cons(Ys[I] - Ret[I] , G);
-      }
+      for(I = 0 ; I < length(Ret) ; I++)Ys[I] = uc();
+      G = vtol(ltov(Ret) - Ys);
       /* algorithm7.1 step(2) */
       Jhat = nd_gr(G , append(Xs , vtol(Ys)) , 0 , [[0,length(Xs)],[0,length(Ys)]]);
       J = noro_pd.elimination(Jhat , vtol(Ys));
@@ -362,7 +360,10 @@ def linvar(IG , RM , Xs){
       for(S=homogeneousInvariants(IG,RM,Xs,Deg) ; S!=[] ; S=cdr(S)){
          SPol = p_nf(car(S) , Jhat , append(Xs , vtol(Ys)) , 0);
          if( intersect(vars(SPol) , Xs)!=[] ){
-            Ret = cons(car(S), Ret);
+            Ret = reverse(cons(car(S), Ret));
+            NewY = uc();
+            Ys = ltov(reverse(cons(NewY , vtol(Ys))));
+            G = cons(car(S) - NewY , Jhat);
             Jhat = nd_gr(cons(car(S),Jhat) , append(Xs , vtol(Ys)) , 0 , [[0,length(Xs)],[0,length(Ys)]]);
          }
       }
