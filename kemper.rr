@@ -199,15 +199,14 @@ Vは、dp_weyl_mulなどで使用するWeyl代数の変数指定法に従う
 */
 def appdiff(P , F , V){
    N = length(V)/2;
-   if(type(P)==9){ /* 分散多項式表現の時 */
-      DP = dp_dtop(P, V);
+   if(type(P)==2){ /* 分散多項式表現でない時 */
+      DP = dp_ptod(P, V);
    }else{
       DP = P;
    }
-   Terms = p_terms(DP , V , 2);
-   for(Ret = 0 , Terms = Terms; Terms!=[] ; Terms=cdr(Terms)){
-      T = car(Terms);
-      C = monocoef(DP , T , V);
+   for(Ret = 0 , DP=DP ; DP ; DP=dp_rest(DP)){
+      T = dp_dtop(dp_ht(DP),V);
+      C = dp_hc(DP);
       Tmp = F;
       for(I = 0 ; I < N ; I++){
          D = deg(T , V[N+I]);
@@ -243,26 +242,58 @@ return [-z*x+y^2];
 */
 def homogeneousInvariants(IG , RM , Xs , D){
     Bases = ltov(gen_monomials(D , Xs));
-    /*   ----  */
+    /*--- computing Lie algebra invariants ---*/
     LBasis = liealg(RM , IG);
     Ds = newvect(length(Xs));
     for(I = 0 ; I < length(Xs) ; I++)Ds[I] = uc();
     for(I = 0 ; I < length(LBasis) ; I++){
         DOP = (Ds*LBasis[I]*matc(ltov(Xs)))[0];
-        Images = newvect(length(Bases));
-        for(J = 0 ; J < length(Bases) ; J++){
-           Images[J] = appdiff(DOP , Bases[J] , append(Xs , vtol(Ds)));
+        Invariants = [];
+        /* remove nilpotents */
+        for(;;){
+           Images = [];
+           for(J = 0 ; J < length(Bases) ; J++){
+              P =  appdiff(DOP , Bases[J] , append(Xs , vtol(Ds)));
+              Images = union(Images , p_terms(P,append(Xs , vtol(Ds)),0) );
+           }
+           NVecs = ltov( diffset(vtol(Bases) , Images) );
+           if(length(NVecs)==0)break;
+           RPols = newvect(length(NVecs));
+           for(J = 0 ; J < length(NVecs) ; J++){
+              RPols[J] = appdiff(DOP , NVecs[J] , append(Xs , vtol(Ds)));
+           }
+           Kernel = p_compute_kernel(newmat(1,length(RPols),[vtol(RPols)]));
+           for(Kernel = Kernel ; Kernel!=[] ; Kernel=cdr(Kernel)){
+               Vec = car(Kernel)[0];
+               NP = Vec*matc(NVecs);
+               if(NP[0]!=0)Invariants = cons(ptozp(NP[0]) , Invariants);
+           }
+           if(length(Images)==0)break;
+           Bases = ltov(Images);
         }
-        Kernel = p_compute_kernel(newmat(1,length(Bases),[vtol(Images)]));
-        NewBases = [];
-        for(Kernel = Kernel ; Kernel!=[] ; Kernel=cdr(Kernel)){
-            Vec = car(Kernel)[0];
-            NP = Vec*matc(Bases);
-            NewBases = cons(ptozp(NP[0]),NewBases);
+        for(Bases = vtol(Bases) ; Bases!=[] ; Bases = cdr(Bases)){
+           V0 = car(Bases);
+           Vs = [V0];
+           for(;;){
+              V0 = appdiff(DOP , V0 , append(Xs,vtol(Ds)));
+              Vs = cons(V0 , Vs);
+              Kernel = p_compute_kernel(newmat(1,length(Vs),[Vs]));
+              if(length(Kernel)==0)continue;
+              As = Kernel[0][0];
+              A0 = As[length(As)-1];
+              if(A0!=0)break;
+              IPol = 0;
+              for(J = 0 ; J < length(As)-1 ; J++){
+                  IPol = IPol + As[J]*Vs[J+1];
+              }
+              IPol = ptozp(IPol/As[length(As)-2]);
+              if(!memq(IPol,Invariants))Invariants = cons(IPol , Invariants);
+              break;
+           }
         }
-        Bases = union(NewBases , []);
+        Bases = ltov(union([] , Invariants));
     }
-    /*   ----  */
+    /*--- computing group invariants ---*/
     GVars = union(vars(IG) , vars(RM));
     AllVars = append(Xs , GVars);
     G = nd_gr(IG , GVars , 0 , 0);
