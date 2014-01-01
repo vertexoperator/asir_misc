@@ -251,10 +251,14 @@ def homogeneousInvariants(IG , RM , Xs , D){
         Invariants = [];
         /* remove nilpotents */
         for(;;){
-           Images = [];
+           XPol = 0;
            for(J = 0 ; J < length(Bases) ; J++){
-              P =  appdiff(DOP , Bases[J] , append(Xs , vtol(Ds)));
-              Images = union(Images , p_terms(P,append(Xs , vtol(Ds)),0) );
+              P = appdiff(DOP , Bases[J] , append(Xs , vtol(Ds)));
+              for(V = dp_ptod(P , Xs) ; V ; V=dp_rest(V))XPol += dp_ht(V);
+           }
+           Images = [];
+           for(V = XPol ; V ; V=dp_rest(V)){
+               Images=cons(dp_dtop(dp_ht(V),Xs) , Images);
            }
            NVecs = ltov( diffset(vtol(Bases) , Images) );
            if(length(NVecs)==0)break;
