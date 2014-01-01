@@ -243,14 +243,16 @@ return [-z*x+y^2];
 */
 def homogeneousInvariants(IG , RM , Xs , D){
     Bases = ltov(gen_monomials(D , Xs));
-    /* -------------- */
+    /*   ----  */
     LBasis = liealg(RM , IG);
     Ds = newvect(length(Xs));
     for(I = 0 ; I < length(Xs) ; I++)Ds[I] = uc();
     for(I = 0 ; I < length(LBasis) ; I++){
         DOP = (Ds*LBasis[I]*matc(ltov(Xs)))[0];
         Images = newvect(length(Bases));
-        for(J = 0 ; J < length(Bases) ; J++)Images[J] = appdiff(DOP , Bases[J] , append(Xs , vtol(Ds)));
+        for(J = 0 ; J < length(Bases) ; J++){
+           Images[J] = appdiff(DOP , Bases[J] , append(Xs , vtol(Ds)));
+        }
         Kernel = p_compute_kernel(newmat(1,length(Bases),[vtol(Images)]));
         NewBases = [];
         for(Kernel = Kernel ; Kernel!=[] ; Kernel=cdr(Kernel)){
@@ -260,29 +262,28 @@ def homogeneousInvariants(IG , RM , Xs , D){
         }
         Bases = union(NewBases , []);
     }
-    /*  ----------------  */
+    /*   ----  */
     GVars = union(vars(IG) , vars(RM));
     AllVars = append(Xs , GVars);
     G = nd_gr(IG , GVars , 0 , 0);
     Ys = RM*ltov(Xs);
     N = length(Bases);
-    RMat = newmat(N,N);
+    RMat = [];
     for(I = 0 ; I< N ; I++){
        P = Bases[I];
        Q = msubst(P , Xs , Ys);
        Q = p_nf(Q-P , G , GVars , 0);
-       for(J = 0 ; J < N ; J++){
-          RMat[J][I] = monocoef(Q,Bases[J],Xs);
-       }
+       RMat = cons(Q , RMat);
     }
-    K = p_compute_kernel(RMat);
     Ret = [];
-    for(I = 0 ; I < length(K) ; I++){
-        P = matr(Bases)*matc(K[I][0]);
+    for(K=p_compute_kernel(newmat(1,N,[reverse(RMat)])) ; K!=[] ; K=cdr(K)){
+        P = matr(Bases)*matc(car(K)[0]);
         Ret = cons(P[0][0],Ret);
     }
     return Ret;
 }
+
+
 
 
 /*
