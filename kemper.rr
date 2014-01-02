@@ -504,6 +504,7 @@ def linvar(IG , RM , Xs){
       if(Hs==[])return Ret;
       for(Hs=Hs ; Hs!=[] ; Hs=cdr(Hs)){
          HPol = car(Hs);
+         /****  FIXME!!!!!!  ****/
          /* We assume IX==[] !! */
          FPol = red(msubst(HPol,Ys,Ret)/msubst(GPol,Ys,Ret));
          P = p_nf(FPol , Lhat , append(Xs,Ys) , 0);
