@@ -4,7 +4,6 @@ partial implementation of algorithms described in
 "Using Extended Derksen Ideals in Computational Invariant Theory"
 http://arxiv.org/abs/1310.6851
 
-algorithm 6.1/7.1/7.2 is implementedi now.
 see test code for examples.
 */
 load("gr");
