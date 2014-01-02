@@ -48,6 +48,7 @@ def diffset(Ls , Rs){
 
 def tdeg(F , Xs){
    Ret = 0;
+   dp_ord(0);
    for(V = dp_ptod(F,Xs) ; V ; V = dp_rest(V)){
       D = 0;
       for(I = 0 ; I < length(Xs) ; I++){
@@ -82,6 +83,12 @@ def monocoef(P,M,V){
    for(T = dp_ptod(P,V) ; T ; T = dp_rest(T)){
       if(dp_ht(T)==HT)return dp_hc(T);
    }
+}
+
+def p_normalize(P,Xs,Ord){
+  if(P==0)return 0;
+  T = p_terms(P,Xs,Ord)[0];
+  return P/monocoef(P,T,Xs);
 }
 
 
@@ -362,7 +369,7 @@ def rationalInvariants(GX , Xs , GY , Ys , Ord){
 
 
 /*
-implementation of algorithm 6.1 and algorithm 7.1
+implementation of algorithm 6.1 and algorithm 6.2(partially)
 */
 def linvar(IG , RM , Xs){
    Zs = append(vars(IG) , vars(RM));
@@ -469,57 +476,47 @@ def linvar(IG , RM , Xs){
       if( length(vars(red(BPols[I]/AP)))==0 ){Check=1;break;}
    }
    if(Check==0){BPols=cons(AP,BPols);}
-   /* start algorithm 7.2 */
+   /* start algorithm 6.2 */
    Ret = [];
-   for(Deg = 1 ; ; Deg++){
-      if(Deg==1){
-         Ys = newvect(length(Ret));
-         for(I = 0 ; I < length(Ret) ; I++)Ys[I] = uc();
-         QG = nd_gr(vtol(Ys - ltov(Ret)) , append(Xs , vtol(Ys)) , 0 , [[0,length(Xs)],[0,length(Ys)]]);
-      }
-      Check1 = 1; /* $B \subset A$? */
-      Check2 = 0; /* $K[X] \dot a \cap A= A \dot a$? */
-      /* Check B \subset A */
-      /*
-         algorithm for subring contaiment:
-         * subroutine 2.5.4 in "Algorithms in Invariant Theory" by Sturmfels
-         * subroutine 2.5 in
-         "Efficient computation offundamental invariants - An approach using Buchberger's Grobner bases method"
-         (Sturmfels and White)
-      */
-      for(I = 0 ; I < length(BPols) ; I++){
-         QPol = p_nf(BPols[I] , QG , append(Xs , vtol(Ys)) , 0);
-         if( intersect(vars(QPol) , Xs)!=[] ){
-             Check1 = 0;
-             break;
-         }
-      }
-      if(AP==1){
-         Check2 = Check1;
-      }else if(Check1==1){
-         Check2 = 1;
-         /* algorithm 7.1 */
-         Jhat = nd_gr(cons(AP , QG) , append(Xs , vtol(Ys)) , 0 , [[0,length(Xs)],[0,length(Ys)]]);
-         for(Hs = noro_pd.elimination(Jhat , vtol(Ys)) ; Hs!=[] ; Hs=cdr(Hs)){
-             HPol = red(msubst(car(Hs) , vtol(Ys) , Ret)/AP);
-             if(vars(dn(HPol))!=[]){Check2=0;break;}
-             QPol = p_nf(HPol , QG , append(Xs , vtol(Ys)) , 0);
-             if( intersect(vars(QPol) , Xs)!=[] ){
-                Check2 = 0;
-                break;
-             }
-         }
-      }
-      if(Check2==1)return Ret;
-      /* algorithm 7.2 step(3)(4) */
-      for(S=homogeneousInvariants(IG,RM,Xs,Deg) ; S!=[] ; S=cdr(S)){
-         SPol = p_nf(car(S) , QG , append(Xs , vtol(Ys)) , 0);
-         if( intersect(vars(SPol) , Xs)!=[] ){
-            Ret = cons(car(S), Ret);
+   Lhat = IX;
+   Ys = [];
+   for(Deg = 1 ; Deg <= max(map(tdeg,BPols,Xs)) ; Deg++){
+      for(Bs=BPols ; Bs!=[] ; Bs=cdr(Bs)){
+         if(tdeg(car(Bs) , Xs)!=Deg)continue;
+         P = p_nf(car(Bs) ,Lhat , append(Xs,Ys) , 0);
+         if(intersect(vars(P) , Xs)!=[]){
             NewY = uc();
-            Ys = ltov(cons(NewY , vtol(Ys)));
-            QG = nd_gr(cons(car(S)-NewY,QG) , append(Xs , vtol(Ys)) , 0 , [[0,length(Xs)],[0,length(Ys)]]);
+            Ret = cons(car(Bs) , Ret);
+            Ys = cons(NewY , Ys);
+            Lhat = nd_gr(cons(NewY - car(Bs) , Lhat) ,append(Xs,Ys) , 0 , [[0,length(Xs)],[0,length(Ys)]]);
          }
+      }
+   }
+   for(;;){
+      NRet = length(Ret);  /* for debug */
+      GPol = p_nf(AP , Lhat , append(Xs,Ys) , 0);
+      Mhat = nd_gr( cons(GPol , Lhat) , append(Xs,Ys) , 0 , [[0,length(Xs)],[0,length(Ys)]]);
+      M = noro_pd.elimination(Mhat , Ys);
+      L = cons(GPol , noro_pd.elimination(Lhat , Ys));
+      M = map(p_normalize,nd_gr(M , Ys , 0 , 0),Ys,0);
+      L = map(p_normalize,nd_gr(L , Ys , 0 , 0),Ys,0);
+      Hs = diffset(M,L);
+      if(Hs==[])return Ret;
+      for(Hs=Hs ; Hs!=[] ; Hs=cdr(Hs)){
+         HPol = car(Hs);
+         /* We assume IX==[] !! */
+         FPol = red(msubst(HPol,Ys,Ret)/msubst(GPol,Ys,Ret));
+         P = p_nf(FPol , Lhat , append(Xs,Ys) , 0);
+         if(intersect(vars(P) , Xs)!=[]){
+            NewY = uc();
+            Ret = cons(FPol , Ret);
+            Ys = cons(NewY,Ys);
+            Lhat = nd_gr(cons(NewY - FPol , Lhat) ,append(Xs,Ys) , 0 , [[0,length(Xs)],[0,length(Ys)]]);
+         }
+      }
+      if(NRet==length(Ret)){
+        print("maybe,some bugs exist");
+        return 0;
       }
    }
 }
