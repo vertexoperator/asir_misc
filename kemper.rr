@@ -398,13 +398,38 @@ def linvar(IG , RM , Xs){
       }
    }
    /* algorithm 6.1 step(8)(9)(10) */
+   K =length(QRats);
+   Hs = map(dn , QRats);
+   Fs = map(nm , QRats);
    if(QRats==[]){
       AP = 1;
       BPols = QPols;
+   }else if(IX==[]){
+      AP = 0;
+      DNs = ltov(union(Hs , []));
+      MINR = 1;
+      for(J = 0 ; J < length(DNs) ; J++){
+         if(MINR < tdeg(DNs[J] , Xs))MINR = tdeg(DNs[J] , Xs);
+      }
+      for(R=MINR ;; R++){
+          InvPols = homogeneousInvariants(IG , RM , Xs , R);
+          if(length(InvPols)==0)continue;
+          SMat = newmat(length(DNs) , length(InvPols));
+          for(I = 0 ; I < length(DNs) ; I++){
+             for(J = 0 ; J < length(InvPols) ; J++){
+                 SMat[I][J] = p_nf(InvPols[J] , [DNs[I]] , Xs , 0);
+             }
+          }
+          Kernel = p_compute_kernel(SMat);
+          for(Kernel=p_compute_kernel(SMat) ; Kernel!=[] ; Kernel=cdr(Kernel)){
+            Vec=car(Kernel)[0];
+            PolVec = Vec*matc(InvPols);
+            AP = PolVec[0];
+            if(AP!=0)break;
+          }
+          if(AP!=0)break;
+      }
    }else{
-      K =length(QRats);
-      Hs = map(dn , QRats);
-      Fs = map(nm , QRats);
       InvPols = [];
       for(R = 1 ;; R++){
          InvPols = append(homogeneousInvariants(IG , RM , Xs , R) , InvPols);
@@ -434,17 +459,17 @@ def linvar(IG , RM , Xs){
              break;
          }
       }
-      BPols = [];
-      for(J = 0 ; J < K ; J++){
-         BPols = cons(red(AP*Fs[J]/Hs[J]) , BPols);
-      }
-      BPols = union(QPols , BPols);
-      Check = 0;
-      for(I = 0 ; I < length(BPols) ; I++){
-         if( length(vars(red(BPols[I]/AP)))==0 ){Check=1;break;}
-      }
-      if(Check==0){BPols=cons(AP,BPols);}
    }
+   BPols = [];
+   for(J = 0 ; J < K ; J++){
+      BPols = cons(red(AP*Fs[J]/Hs[J]) , BPols);
+   }
+   BPols = union(QPols , BPols);
+   Check = 0;
+   for(I = 0 ; I < length(BPols) ; I++){
+      if( length(vars(red(BPols[I]/AP)))==0 ){Check=1;break;}
+   }
+   if(Check==0){BPols=cons(AP,BPols);}
    /* start algorithm 7.1 */
    Ret = [];
    for(Deg = 1 ; ; Deg++){
