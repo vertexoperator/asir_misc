@@ -469,13 +469,13 @@ def linvar(IG , RM , Xs){
       if( length(vars(red(BPols[I]/AP)))==0 ){Check=1;break;}
    }
    if(Check==0){BPols=cons(AP,BPols);}
-   /* start algorithm 7.1 */
+   /* start algorithm 7.2 */
    Ret = [];
    for(Deg = 1 ; ; Deg++){
       if(Deg==1){
          Ys = newvect(length(Ret));
          for(I = 0 ; I < length(Ret) ; I++)Ys[I] = uc();
-         Jhat = nd_gr(vtol(Ys - ltov(Ret)) , append(Xs , vtol(Ys)) , 0 , [[0,length(Xs)],[0,length(Ys)]]);
+         QG = nd_gr(vtol(Ys - ltov(Ret)) , append(Xs , vtol(Ys)) , 0 , [[0,length(Xs)],[0,length(Ys)]]);
       }
       Check1 = 1; /* $B \subset A$? */
       Check2 = 0; /* $K[X] \dot a \cap A= A \dot a$? */
@@ -488,7 +488,7 @@ def linvar(IG , RM , Xs){
          (Sturmfels and White)
       */
       for(I = 0 ; I < length(BPols) ; I++){
-         QPol = p_nf(BPols[I] , Jhat , append(Xs , vtol(Ys)) , 0);
+         QPol = p_nf(BPols[I] , QG , append(Xs , vtol(Ys)) , 0);
          if( intersect(vars(QPol) , Xs)!=[] ){
              Check1 = 0;
              break;
@@ -498,10 +498,12 @@ def linvar(IG , RM , Xs){
          Check2 = Check1;
       }else if(Check1==1){
          Check2 = 1;
+         /* algorithm 7.1 */
+         Jhat = nd_gr(cons(AP , QG) , append(Xs , vtol(Ys)) , 0 , [[0,length(Xs)],[0,length(Ys)]]);
          for(Hs = noro_pd.elimination(Jhat , vtol(Ys)) ; Hs!=[] ; Hs=cdr(Hs)){
              HPol = red(msubst(car(Hs) , vtol(Ys) , Ret)/AP);
-             if(dn(HPol)!=1){Check2=0;break;}
-             QPol = p_nf(HPol , Jhat , append(Xs , vtol(Ys)) , 0);
+             if(vars(dn(HPol))!=[]){Check2=0;break;}
+             QPol = p_nf(HPol , QG , append(Xs , vtol(Ys)) , 0);
              if( intersect(vars(QPol) , Xs)!=[] ){
                 Check2 = 0;
                 break;
@@ -511,12 +513,12 @@ def linvar(IG , RM , Xs){
       if(Check2==1)return Ret;
       /* algorithm 7.2 step(3)(4) */
       for(S=homogeneousInvariants(IG,RM,Xs,Deg) ; S!=[] ; S=cdr(S)){
-         SPol = p_nf(car(S) , Jhat , append(Xs , vtol(Ys)) , 0);
+         SPol = p_nf(car(S) , QG , append(Xs , vtol(Ys)) , 0);
          if( intersect(vars(SPol) , Xs)!=[] ){
             Ret = cons(car(S), Ret);
             NewY = uc();
             Ys = ltov(cons(NewY , vtol(Ys)));
-            Jhat = nd_gr(cons(car(S)-NewY,Jhat) , append(Xs , vtol(Ys)) , 0 , [[0,length(Xs)],[0,length(Ys)]]);
+            QG = nd_gr(cons(car(S)-NewY,QG) , append(Xs , vtol(Ys)) , 0 , [[0,length(Xs)],[0,length(Ys)]]);
          }
       }
    }
@@ -598,6 +600,16 @@ def test_linvar(){
          (x2-x3)*(x1-x3)+(y2-y3)*(y1-y3) , z];
    print("7-dim rep. of ISO(2):");
    if(!rngeq(R1,R2)){print("failed");}else{print("OK");}
+
+
+   /* 4-dim rep. of G_a */
+   /* example6.1 of "Towards non-reductive geometric invariant theory" */
+   /* arXiv:math/0703131 */ 
+   R1=linvar([] , newmat(4,4,[[1,0,0,0],[b,1,0,0],[b^2,2*b,1,0],[b^3,3*b^2,3*b,1]]) , [x0,x1,x2,x3]);
+   R2=[x0 , x0*x2-x1^2 , 2*x1^3+x0^2*x3-3*x0*x1*x2, 6*x0*x1*x2*x3-x0^2*x3^2+3*x1^2*x2^2-4*x1^3*x3-4*x0*x2^3];
+   print("4-dim rep. of G_a:");
+   if(!rngeq(R1,R2)){print("failed");}else{print("OK");}
+
 
    /* 6-dim rep. of O(2) x {+1,-1} */
    /* example5.9.1(p.229) of 'computational invariant theory'(Derksen/Kemper) */
