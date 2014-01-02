@@ -420,7 +420,6 @@ def linvar(IG , RM , Xs){
                  SMat[I][J] = p_nf(InvPols[J] , [DNs[I]] , Xs , 0);
              }
           }
-          Kernel = p_compute_kernel(SMat);
           for(Kernel=p_compute_kernel(SMat) ; Kernel!=[] ; Kernel=cdr(Kernel)){
             Vec=car(Kernel)[0];
             PolVec = Vec*matc(InvPols);
