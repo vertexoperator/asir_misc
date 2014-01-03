@@ -412,10 +412,20 @@ def linvar(IG , RM , Xs){
       BPols = QPols;
    }else if(IX==[]){
       AP = 0;
-      DNs = ltov(union(Hs , []));
-      MINR = 1;
+      DNs = union(Hs , []);
+      MINR = max(map(tdeg,DNs,Xs));
+      DNs = ltov(DNs);
       for(J = 0 ; J < length(DNs) ; J++){
-         if(MINR < tdeg(DNs[J] , Xs))MINR = tdeg(DNs[J] , Xs);
+         if(tdeg(DNs[J],Xs)!=MINR)continue;
+         PJ = msubst(DNs[J] , Xs , RM*ltov(Xs));
+         PJ = p_nf(PJ , GG , Zs , 0);
+         if(PJ!=DNs[J])continue;
+         Check0 = 1;
+         for(T = 0 ; T < length(DNs) ; T++){
+            QT = DNs[T];
+            if(vars(dn(red(PJ/QT)))!=[]){Check0=0;break;}
+         }
+         if(Check0==1){AP = PJ;break;}
       }
       for(R=MINR ;; R++){
           InvPols = homogeneousInvariants(IG , RM , Xs , R);
