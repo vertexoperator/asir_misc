@@ -1,0 +1,384 @@
+/*
+A new efficient algorithm for computing Groebner bases without reduction to zero (F5)
+http://www.risc.jku.at/Groebner-Bases-Bibliography/gbbib_files/publication_502.pdf
+http://dl.acm.org/citation.cfm?id=780516
+
+
+F5C: a variant of Faugere's F5 algorithm with reduced Groebner bases
+http://arxiv.org/abs/0906.2967
+*/
+load("gr");
+
+/*
+eq:return 0
+r1 > r2:return 1
+r1 < r2:return 2
+*/
+def cmpSig(R1 , R2){
+   for(I = 0 ; I < length(R1) ; I++){
+      HT1 = dp_ht(R1[I]);
+      HT2 = dp_ht(R2[I]);
+      if(HT1==HT2)continue;
+      HT = dp_ht(HT1 + HT2);
+      if(HT==HT1)return 1;
+      if(HT==HT2)return 2;
+   }
+   return 0;
+}
+
+
+/*
+signaturedPolynomial
+   newSigPol : Signature -> Polynomial -> signaturedPolynomial
+   polyR : signaturedPolynomial -> Polynomial
+   indexR : signaturedPolynomial -> Nat
+   sigR : signaturedPolynomial -> Signature
+*/
+struct signaturedPolynomial {signature , polynomial , index , id};
+
+def newSigPol(S , P){
+   SP = newstruct(signaturedPolynomial);
+   SP->signature = S;
+   SP->polynomial = P;
+   SP->id = uc();   /* identifier */
+   for(I = 0 ; I < length(S) ; I++){
+      if(S[I]!=0){
+          SP->index = I;
+          return SP;
+      }
+   }
+}
+
+def polyR(SP){
+   return SP->polynomial;
+}
+
+def indexR(SP){
+   return SP->index;
+}
+
+def sigR(SP){
+  return SP->signature;
+}
+
+def idR(SP){
+  return SP->id;
+}
+
+
+
+def sortCriticalPairs(Ps){
+   if(length(Ps)<=1){
+      return Ps;
+   }else{
+      P = car(Ps);
+      PDeg = dp_td(car(P));
+      L1 = [];
+      L2 = [];
+      for(Q=cdr(Ps) ; Q!=[] ; Q=cdr(Q)){
+          QDeg = dp_td(car( car(Q) ));
+          if (QDeg<PDeg){
+              L1 = cons(car(Q),L1);
+          }else{
+              L2 = cons(car(Q),L2);
+          }
+      }
+      return append(sortCriticalPairs(L1) , cons(P , sortCriticalPairs(L2)));
+   }
+}
+
+def sortSigPols(RS){
+   if(length(RS)<=1){
+      return RS;
+   }else{
+      R1 = car(RS);
+      L1 = [];
+      L2 = [];
+      for(RC = cdr(RS) ; RC!=[] ; RC=cdr(RC)){
+          R2 = car(RC);
+          if(cmpSig(sigR(R1),sigR(R2))==2){
+              L2 = cons(R2,L2);
+          }else{
+              L1 = cons(R2,L1);
+          }
+      }
+      return append(sortSigPols(L1) , cons(R1 , sortSigPols(L2)));
+   }
+}
+
+
+def criticalPair(R1 , R2 , K , G){
+   P1 = polyR(R1);
+   P2 = polyR(R2);
+   T = dp_lcm(dp_ht(P1) , dp_ht(P2));
+   U1 = dp_subd(T , P1);
+   U2 = dp_subd(T , P2);
+   IL = vtol(newvect(length(G)));
+   if(cmpSig(U1*sigR(R1) , U2*sigR(R2))==2){
+      K2 = indexR(R2);
+      if(K2>K)return [];
+      UT2 = U2*sigR(R2)[K2];
+      if( dp_nf(IL , UT2 , G , 1)!=UT2 )return [];
+      K1 = indexR(R1);
+      UT1 = U1*sigR(R1)[K1];
+      if(K1==K && dp_nf(IL , UT1 , G , 1)!=UT1)return [];
+      return [T,U2,R2,U1,R1];
+   }else{
+      K1 = indexR(R1);
+      if(K1>K)return [];
+      UT1 = U1*sigR(R1)[K1];
+      if( dp_nf(IL , UT1 , G , 1)!=UT1 )return [];
+      K2 = indexR(R2);
+      UT2 = U2*sigR(R2)[K2];
+      if(K2=K && dp_nf(IL , UT2 , G , 1)!=UT2)return [];
+      return [T,U1,R1,U2,R2];
+   }
+}
+
+def isRewritable(U , RK , Rule){
+    I = indexR(RK);
+    T = sigR(RK)[I];
+    for(L = Rule[I] ; L!=[] ; L=cdr(L)){
+       R = car(L);
+       TI = sigR(R)[indexR(R)];
+       if( dp_redble(U*T , TI) ){
+          return (RK->id!=R->id);
+       }
+    }
+    return 0;
+}
+
+
+def computeSPols(CritPairs , Rule){
+   Ret = [];
+   for(Pairs = CritPairs ; Pairs!=[] ; Pairs=cdr(Pairs)){
+       CritPair = car(Pairs);
+       T = car(CritPair);
+       CritPair = cdr(CritPair);
+       U = car(CritPair);
+       CritPair = cdr(CritPair);
+       RI = car(CritPair);
+       CritPair = cdr(CritPair);
+       V = car(CritPair);
+       CritPair = cdr(CritPair);
+       RJ = car(CritPair);
+       if(!isRewritable(U,RI,Rule) && !isRewritable(V,RJ,Rule)){
+          PI = polyR(RI);
+          PJ = polyR(RJ);
+          /* assert(U*sigR(RI) >= V*sigR(RJ); */
+          RN = newSigPol(U*sigR(RI) , U*PI/dp_hc(PI) - V*PJ/dp_hc(PJ));
+          Ret = cons(RN,Ret);
+          Idx = indexR(RN);
+          Rule[Idx] = cons(RN , Rule[Idx]);
+       }
+   }
+   Ret = sortSigPols(Ret);
+   return Ret;
+}
+
+
+
+def reductionF5(S , G , Gsig_next  , Rule){
+   ToDoList = S;
+   CompletedList = [];
+   IL = vtol(newvect(length(G)));
+   while(ToDoList!=[]){
+       H = car(ToDoList);   /* ToDoList is sorted */
+       HP = dp_nf(IL , polyR(H) , G , 1);
+       H->polynomial = HP;
+       Res = topReduction(H , G , append(Gsig_next,CompletedList) , Rule);
+       CompletedList = append(CompletedList , car(Res));
+       ReDoList = cadr(Res);
+       ToDoList = append(cdr(ToDoList) , ReDoList);
+       if(length(ReDoList)>0){
+           ToDoList = sortSigPols(ToDoList);
+       }
+   }
+   return CompletedList;
+}
+
+
+
+def topReduction(RK , G , Gsig_cand , Rule){
+   P = polyR(RK);
+   if(P==0){
+      /*  Warning:“the system is not a regular sequence”*/
+      return [ [] , []];
+   }
+   /* find reductor */
+   IL = vtol(newvect(length(G)));
+   T = dp_ht(P);
+   for(RList = Gsig_cand ; RList!=[] ; RList=cdr(RList)){
+       RJ = car(RList);
+       Q = polyR(RJ);
+       T2 = dp_ht(Q);
+       if(!dp_redble(T,T2))continue;
+       U = dp_subd(T , T2);
+       UT = U*sigR(RJ)[indexR(RJ)];
+       if( dp_nf(IL , UT , G , 1)!=UT )continue;
+       if( isRewritable(U , RJ , Rule) )continue;
+       CR = cmpSig(U*sigR(RJ) , sigR(RK));
+       if(CR==0)continue;
+       P = P - dp_hc(P)*U*Q/dp_hc(Q);
+       if(P!=0)P=dp_ptozp( P/dp_hc(P) );
+       if(CR==2){
+           RK->polynomial = P;
+           return [ [] , [RK]];
+       }else{ /* CR==1 */
+           RN = newSigPol(U*sigR(RJ) , P);
+           Rule[indexR(RN)] = cons(RN , Rule[indexR(RN)]);
+           return [ [] , [RK,RN]];
+       }
+   }
+   RK->polynomial = dp_ptozp( P/dp_hc(P) );
+   return [ [RK] , []];
+}
+
+
+
+def f5(Polys_ , Vars , Ord){
+   SaveOrd = dp_ord();
+   dp_ord(Ord);
+   Polys = map(dp_ptod , Polys_ , Vars);
+   Rule = newvect(length(Polys));
+   FVecs = [];
+   for (I = 0 ; I <length(Polys) ; I++){
+     Rule[I] = [];
+     V = newvect(length(Polys));
+     V[I] = 1;
+     FVecs = cons(V,FVecs);
+     if(dp_td(Polys[I])==0)return [1];
+   }
+   FVecs = reverse(FVecs);
+   R = newSigPol(FVecs[0] , Polys[0]);
+   Gsig = [R];
+   for(I = 1 ; I < length(Polys) ; I++){
+      /* increment basis */
+      G = vect(map(polyR , Gsig)); /* G is Grobner basis for <Polys[0] , ... , Polys[I-1]> */
+      /* print( ["F5@loop:",I,map(dp_dtop , G , Vars)] ); */
+      R = newSigPol(FVecs[I] , Polys[I]);
+      P = [];
+      for(RC = Gsig ; RC!=[] ; RC=cdr(RC)){
+         CritPair = criticalPair(R , car(RC) , I , G);
+         if(CritPair!=[])P = cons(CritPair , P);
+      }
+      Gsig_next = cons(R , Gsig);
+      P = sortCriticalPairs(P);
+      while(P!=[]){
+         CritPair = car(P);
+         MinDeg = dp_td(car(CritPair));  /* assert(P is sorted by degree) */
+         for(Pd=[] ; P!=[] ; P=cdr(P)){
+            CritPair = car(P);
+            if(dp_td(car(CritPair))==MinDeg){
+               Pd=cons(CritPair , Pd);
+            }else{
+               break;
+            }
+         }
+         F = computeSPols(Pd , Rule);
+         Rd = reductionF5(F , G , Gsig_next , Rule);
+         for( ; Rd!=[] ; Rd=cdr(Rd) ){
+            R = car(Rd);
+            if( dp_td(polyR(R))==0 )return [1];
+            for( RC = Gsig_next ; RC!=[] ; RC=cdr(RC) ){
+               CritPair = criticalPair(R , car(RC) , I , G);
+               if(CritPair!=[])P = cons(CritPair , P);
+            }
+            Gsig_next = cons(R , Gsig_next);
+         }
+         P = sortCriticalPairs(P);
+      }
+      Gsig = Gsig_next;
+      /* end of increment basis */
+   }
+   G = map(dp_dtop , map(polyR,Gsig) , Vars);
+   dp_ord(SaveOrd);
+   /* compute reduced Grobner basis */
+   Hs = G;
+   G = [];
+   while(Hs!=[]){
+       H = p_nf(car(Hs) , append(G , cdr(Hs)) , Vars , Ord);
+       C= dp_hc(dp_ptod(H,Vars));
+       if(H!=0)G=cons(ptozp(H/C),G);
+       Hs=cdr(Hs);
+   }
+   return G;
+}
+
+
+/*
+naive implementation of Buchberger algorithm
+*/
+def buchberger(Polys , Vars , Ord){
+    SaveOrd = dp_ord();
+    dp_ord(Ord);
+    Pairs = [];
+    IL = [];
+    for(I=length(Polys)-1 ; I>=0 ; I--){
+       IL = cons(I,IL);
+       for(J=length(Polys)-1 ; J>I ; J--){
+           Pairs = cons([I,J],Pairs);
+       }
+    }
+    N = length(Polys);
+    G = map(dp_ptod,Polys,Vars);
+    while(Pairs!=[]){
+        Pair = car(Pairs);
+        Pairs = cdr(Pairs);
+        P = G[Pair[0]];
+        Q = G[Pair[1]];
+        LCM = dp_lcm(dp_hm(P) , dp_hm(Q));
+        SP = dp_subd(LCM , P)*P/dp_hc(P) - dp_subd(LCM , Q)*Q/dp_hc(Q);
+        Rem = dp_nf(IL , SP , G , 1);
+        if(Rem!=0){
+            G = append(G , [dp_ptozp(Rem)]);
+            for(I =  0; I < N ; I++){
+                Pairs = cons([I,N],Pairs);
+            }
+            IL = append(IL , [N]);
+            N++;
+        }
+    }
+    G = map(dp_dtop,G,Vars);
+    /* compute reduced Grobner basis */
+    Hs = G;
+    G = [];
+    while(Hs!=[]){
+        H = p_nf(car(Hs) , append(G , cdr(Hs)) , Vars , Ord);
+        C= dp_hc(dp_ptod(H,Vars));
+        if(H!=0)G=cons(ptozp(H/C),G);
+        Hs=cdr(Hs);
+    }
+    /* end of computing reduced Grobner basis */
+    dp_ord(SaveOrd);
+    return G;
+}
+
+/*
+
+gb_comp(f5([x-y*z,y-z*x,z-x*y],[x,y,z],0) , gr([x-y*z,y-z*x,z-x*y],[x,y,z],0));
+
+
+
+load("katsura");
+load("cyclic");
+
+Names=["katsura(3)" , "katsura(4)" , "cyclic(3)" , "cyclic(4)"];
+G = [katsura(3) , katsura(4) , cyclic(3) , cyclic(4)];
+V = [[u0,u1,u2,u3] , [u0,u1,u2,u3,u4] , [c0,c1,c2] , [c0,c1,c2,c3]];
+for(I = 0 ; I < 4 ; I++){
+   print(Names[I]);
+   print("F5:");
+   tstart();
+   f5(G[I] , V[I] , 0);
+   tstop();
+   print("gr:");
+   tstart(); 
+   gr(G[I] , V[I] , 0);
+   tstop();
+   print("\n");
+}
+
+*/
+
+
