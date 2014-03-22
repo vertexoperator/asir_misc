@@ -329,7 +329,7 @@ def buchberger(Polys , Vars , Ord){
         Q = G[Pair[1]];
         LCM = dp_lcm(dp_hm(P) , dp_hm(Q));
         SP = dp_subd(LCM , P)*P/dp_hc(P) - dp_subd(LCM , Q)*Q/dp_hc(Q);
-        Rem = dp_nf(IL , SP , G , 1);
+        Rem = dp_nf(IL , SP , vect(G) , 1);
         if(Rem!=0){
             G = append(G , [dp_ptozp(Rem)]);
             for(I =  0; I < N ; I++){
