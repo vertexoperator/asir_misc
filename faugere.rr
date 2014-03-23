@@ -292,7 +292,6 @@ def f5(Polys_ , Vars , Ord){
       /* end of increment basis */
    }
    G = map(dp_dtop , map(polyR,Gsig) , Vars);
-   dp_ord(SaveOrd);
    /* compute reduced Grobner basis */
    Hs = G;
    G = [];
@@ -302,6 +301,7 @@ def f5(Polys_ , Vars , Ord){
        if(H!=0)G=cons(ptozp(H/C),G);
        Hs=cdr(Hs);
    }
+   dp_ord(SaveOrd);
    return G;
 }
 
