@@ -354,31 +354,5 @@ def buchberger(Polys , Vars , Ord){
     return G;
 }
 
-/*
-
-gb_comp(f5([x-y*z,y-z*x,z-x*y],[x,y,z],0) , gr([x-y*z,y-z*x,z-x*y],[x,y,z],0));
-
-
-
-load("katsura");
-load("cyclic");
-
-Names=["katsura(3)" , "katsura(4)" , "cyclic(3)" , "cyclic(4)"];
-G = [katsura(3) , katsura(4) , cyclic(3) , cyclic(4)];
-V = [[u0,u1,u2,u3] , [u0,u1,u2,u3,u4] , [c0,c1,c2] , [c0,c1,c2,c3]];
-for(I = 0 ; I < 4 ; I++){
-   print(Names[I]);
-   print("F5:");
-   tstart();
-   f5(G[I] , V[I] , 0);
-   tstop();
-   print("gr:");
-   tstart(); 
-   gr(G[I] , V[I] , 0);
-   tstop();
-   print("\n");
-}
-
-*/
 
 
