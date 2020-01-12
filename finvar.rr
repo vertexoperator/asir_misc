@@ -57,39 +57,62 @@ def memq(Obj , Ls){
 }
 
 /* 行列群の生成元から全ての要素の集合を返す */
-def grp(Gens){
+def grp(_Gens){
   Ret = [];
-  if(length(Gens)==0)return Ret;
-  Dim = size( Gens[0] )[0];
+  if(length(_Gens)==0)return Ret;
+  Dim = size( _Gens[0] )[0];
   Id = newmat(Dim , Dim);
   for(I = 0 ; I < Dim ; I++)Id[I][I] = 1;
   Zero = newmat(Dim , Dim);
-  Ret = Gens;
+  for(I = 0;I<length(_Gens);I++){
+     Check=0;
+     for(K=0;K<length(Ret);K++){
+        if(map(simpalg,_Gens[I] - Ret[K])==Zero)Check=1;
+        if(map(simpalg,_Gens[I])==Id)Check=1;
+        if(map(simpalg,_Gens[I])==Zero)return [];
+     }
+     if(Check==0){
+        Ret = cons(map(simpalg,_Gens[I]),Ret);
+     }
+  }
+  Gens = Ret;
+  OldCount = 0;
   for(;;){
-     Cnt = 0;
+     News = [];
      for(I = 0 ; I <length(Gens) ; I++){
-        for(J = 0 ; J < length(Ret) ; J++){
+        for(J = OldCount ; J < length(Ret) ; J++){
             E = map(simpalg,Gens[I] * Ret[J]);
             if(E==Id)continue;
             /* 新しい要素かどうか */
             Check = 1;
             for(K=0 ; K<length(Ret) ; K++){
                /* 代数的数同士の比較では、simpalg(a)==simpalg(b)では不十分 */
-               if(map(simpalg,E-Ret[K])==Zero){
+               if(map(simpalg, E-Ret[K])==Zero){
                    Check = 0;
                    break;
                }
             }
             if(Check==1){
-                 Ret = cons(E , Ret);
-                 Cnt += 1;
+                for(K=0 ; K<length(News) ; K++){
+                   /* 代数的数同士の比較では、simpalg(a)==simpalg(b)では不十分 */
+                   if(map(simpalg,E-News[K])==Zero){
+                      Check = 0;
+                      break;
+                   }
+                 }
             }
+	    if(Check==1)News = cons(E , News);
+
         }
      }
-     if(Cnt == 0)return cons(Id,Ret);
+     if(length(News) == 0){
+        return cons(Id,Ret);
+     }else{
+        OldCount = length(Ret);
+        Ret = append(Ret,News);
+     }
   }
 }
-
 
 /* 
 0次元イデアルかどうか
@@ -157,7 +180,7 @@ def p_mbase(I , Vars){
 
 
 /* 
-Molienの公式によるHilbert級数の計算(有理式を返すけど、redしてないので注意)
+Molienの公式によるHilbert級数の計算(有理式を返す)
 Elementsには、群の要素が行列で入っているとする
 (つまり、有限群の線形表現の像の集合)
 
@@ -169,16 +192,51 @@ S = molien([newmat(3,3,[[1,0,0],[0,1,0],[0,0,1]]),
 */
 def molien( Elements ){
   T = uc();  /* Hilbert級数の変数 */
-  G = length(Elements); /* 群の位数 */
-  RET = 0;
   Dim = size(Elements[0])[0];
   Id = newmat(Dim , Dim); /* 恒等行列 */
   for (I = 0; I < Dim ; I++)Id[I][I] = 1;
-  for (I = 0 ; I < G; I++){
-     RET = simpalg(RET + 1/det(Id - T*Elements[I]));
+  /* 代数的数を一回、通常の変数に戻す */
+  ANList = [];       /* list of algebraic numbers */
+  ANVars = [];       /* variables of algebraic numbers */
+  ANDefs = [];       /* defpolys of algebraic numbers */
+  Matrices = [];
+  for(Top=Elements;Top!=[];Top=cdr(Top)){
+     K = car(Top);
+     Dims = size(K);
+     M = newmat(Dims[0], Dims[1]);
+     for(I=0;I<Dims[0];I++){
+        for(J=0;J<Dims[1];J++){
+           KIJ = simpalg(K[I][J]);
+           MIJ = algtorat(KIJ);
+           M[I][J] = red(MIJ);
+           AN_loc = vars( MIJ );
+           for(ANTop = AN_loc ; ANTop!=[] ; ANTop=cdr(ANTop)){
+	       V = car(ANTop);
+               if(!memq(V , ANVars)){
+                 ANList = cons(rattoalg(V) , ANList);
+                 ANVars = cons(V , ANVars);
+                 ANDefs = cons(defpoly(rattoalg(V)) , ANDefs);
+               }
+           }
+        }
+     }
+     Matrices = cons(M , Matrices);
   }
-  return RET/G;
+  /*  ------- */
+  Ret = 0;
+  for(Top=Matrices;Top!=[];Top=cdr(Top)){
+     P = p_nf(det(Id - T*car(Top)) , ANDefs , ANVars , 0);
+     Ret = Ret + 1/P;
+     NM = p_nf(nm(Ret) , ANDefs , ANVars , 0);
+     DN = p_nf(dn(Ret) , ANDefs , ANVars , 0);
+     Ret = red(NM/DN);
+  }
+  /* back to algnum */
+  return red(rattoalgp(Ret/length(Elements) , ANList));
+
 }
+
+
 
 
 /* 次数Degの単項式の生成 */
@@ -211,6 +269,25 @@ def hdeg(Expr , Vars){
 }
 
 
+
+/* 群の要素を変数に作用させた時の行き先をリストアップ */
+def makeGMap(Elements , Vars){
+  Src = newvect(length(Vars));
+  GMap = newmat(length(Elements) , length(Vars));
+  for(I=0;I<length(Src);I++){
+    Src[I] = Vars[I];
+  }
+  for(Top=Elements,K=0;Top!=[];Top=cdr(Top),K++){
+     A = car(Top);
+     Dst = A*Src;
+     for (I=0 ; I < length(Vars) ; I++){
+        GMap[K][I] = Dst[I];
+     }
+  }
+  return GMap;
+}
+
+
 /* 
 primary invariantsの計算 
 Elements:群の線形表現の像の集合
@@ -235,8 +312,8 @@ Omega = newalg(x^2+x+1);
 priminv( grp([newmat(2,2,[[Omega,0],[0,1/Omega]])]) , [x,y]);
 
 例4:Shephard-Toddの複素鏡映群No.4
-Omega = (-1-Root3I)/2;
 Root3I = newalg(x^2+3);
+Omega = (-1-Root3I)/2;
 G = grp( [newmat(2,2,[[1,2],[1,-1]])/(Root3I) , newmat(2,2,[[1,0],[0,Omega]])]);
 priminv(G , [x,y]);
 
@@ -247,7 +324,65 @@ G = grp( [(1-Imaginary)*newmat(2,2,[[1,-1],[1,1]])/2 , newmat(2,2,[[-Imaginary,0
 priminv(G , [x,y]);
 
 */
-def priminv( Elements ,Vars ){
+def priminvD(Elements , Vars , Degrees){
+  Ret = [];
+  GB = [];
+  if(length(Degrees)==0)return Ret;
+
+  TmpVars = newvect(length(Vars));
+  for(I = 0 ; I < length(Vars) ; I++)TmpVars[I] = uc();
+  /* assert(length(Elements) > 0); */
+  /* length(Vars)==Sz[0]==Sz[1]==表現空間の次元 */
+  Dim = size(Elements[0])[0];
+  /* 群作用の行先 */
+  GMap = makeGMap(Elements, Vars);
+  for(Top=Degrees ; Top!=[] ; Top=cdr(Top)){
+      Monomials = gen_monomial(Vars , car(Top));
+      for(It = Monomials ; It!=[] ; It=cdr(It)){
+          RM = 0;
+          /* Monomials[J]にReynolds作用素をapply */
+          for(K = 0 ; K < length(Elements) ; K++){
+            M = car(It);
+            for(I=0 ; I<length(Vars) ; I++)M=subst(M , Vars[I] , TmpVars[I]);
+            for(I=0 ; I<length(Vars) ; I++)M=subst(M , TmpVars[I] , GMap[K][I]);
+            RM += M;
+          }
+          RM = simpalg(RM);
+          if(RM==0)continue;
+          RM = ptozp( RM/length(Elements) );
+          if(length(Ret)==0){
+            Ret = cons(RM , Ret);
+            GB = cons(RM , GB);
+            break;
+	  }else{
+            if( radmember(RM , GB , Vars)==0 ){
+                Ret = cons(RM , Ret);
+                GB = cons(RM, GB);
+                GB = nd_gr(GB , Vars, 0 , 0);
+                break;
+	    }
+          }
+      }
+  }
+  return Ret;
+}
+
+def priminvH(Elements ,Vars ,H){
+  T = var(H);
+  if(deg(H,T)==0){
+     Rest = dn(H);
+     Degs = [];
+     for(Deg=length(Elements) ; Deg != 0 ;  Deg--){
+       if(deg(Rest,T) < Deg)continue;
+       P = red(Rest/(1-T^Deg));
+       if(dn(P)==1){
+          Rest = P;
+          Degs = cons(Deg , Degs);
+          Deg++;  /*  同じ次数を繰り返す  */
+       }
+     }
+     if(deg(Rest,T)==0)return priminvD(Elements , Vars, Degs);
+  }
   RET = [];
   TmpVars = newvect(length(Vars));
   for(I = 0 ; I < length(Vars) ; I++)TmpVars[I] = uc();
@@ -255,18 +390,8 @@ def priminv( Elements ,Vars ){
   /* length(Vars)==Sz[0]==Sz[1]==表現空間の次元 */
   Dim = size(Elements[0])[0];
   /* 群作用の行先 */
-  GMap = newvect(length(Elements));
-  for (K = 0 ; K < length(Elements) ; K++){
-      Pt = newvect(Dim);
-      for (I=0 ; I < length(Vars) ; I++){
-         for (J = 0 ; J < Dim ; J++){
-             Pt[I] += Elements[K][I][J] * Vars[J];
-         }
-      }
-      GMap[K] = Pt;
-   }
+  GMap = makeGMap(Elements, Vars);
   /* main loop */
-  H = molien(Elements);
   GRet = [];
   for(D=1 ; ; D++){
       /* Hilbert級数を、次数Dまで形式的べき級数に展開 */
@@ -308,6 +433,10 @@ def priminv( Elements ,Vars ){
   }
 }
 
+def priminv(Elements , Vars){
+   H = molien(Elements);
+   return priminvH(Elements , Vars, H);
+}
 
 /*
 有限群の不変式を計算する
@@ -336,7 +465,7 @@ finvar([newmat(2,2,[[1,0],[0,1]]) , newmat(2,2,[[-1,0],[0,1]]) ,
 例5:4次巡回群 generated by f(x,y)=f(-y,x)
 finvar( grp([newmat(2,2,[[0,-1],[1,0]])]) , [x,y]);
 
-例6:Shephard?Toddの複素鏡映群No.9(少し時間がかかる)
+例6:Shephard-Toddの複素鏡映群No.9(少し時間がかかる)
 Root2 = newalg(x^2-2);
 Z2 = newalg(x^2+1);
 G = grp([ newmat(2,2,[[1,1],[1,-1]])/Root2 , newmat(2,2,[[1,0],[0,Z2]])]);
@@ -377,37 +506,21 @@ G = grp([newmat(2,2,[[-Z5+Z5^4,Z5^2-Z5^3],[Z5^2-Z5^3,Z5-Z5^4]])/Root5,
 finvar( G , [x,y]);
 
 */
-def finvar(Elements , Vars){
-   Ps = priminv(Elements , Vars);
-   GPs = nd_gr(Ps , Vars , 0 , 0);
-   Ss = []; /*secondary invariants */
-   TmpVars = newvect(length(Vars));
-   for(I = 0 ; I < length(Vars) ; I++)TmpVars[I] = uc();
-   /* 群作用の行先 */
-   Dim = length(Vars);
-   GMap = [];
-   for (K = 0 ; K < length(Elements) ; K++){
-      Pt = newvect(Dim);
-      for (I=0 ; I < length(Vars) ; I++){
-         for (J = 0 ; J < Dim ; J++){
-             Pt[I] += Elements[K][I][J] * Vars[J];
-         }
-      }
-      GMap = cons(Pt, GMap);
-   }
+def finvarH(Elements , Vars , H){
+   Ps = priminvH(Elements , Vars, H);
    /* ================= */
-   H = molien(Elements);
    for(I = 0 ; I < length(Ps) ; I++){
        H = H*(1-var(H)^hdeg(Ps[I],Vars));
    }
    H = red(H);
    if(H==1)return [Ps,[1]];
-   /*
-   Monomials = [];
-   for(D=0;D<=deg(H,var(H));D++){
-         Monomials = append(gen_monomial(Vars,D) , Monomials);
-   }
-   */
+   Ss = []; /*secondary invariants */
+   TmpVars = newvect(length(Vars));
+   for(I = 0 ; I < length(Vars) ; I++)TmpVars[I] = uc();
+   /* 群作用の行先 */
+   Dim = length(Vars);
+   GMap = makeGMap(Elements , Vars);
+   GPs = nd_gr(Ps , Vars , 0 , 0);
    Monomials = p_mbase(Ps , Vars);
    for (L = 0 ; L < length(Monomials) ; L++){
       Deg = hdeg(Monomials[L] , Vars);
@@ -436,6 +549,11 @@ def finvar(Elements , Vars){
       }
    }
    return [Ps,Ss];
+}
+
+def finvar(Elements , Vars){
+   H = molien(Elements);
+   return finvarH(Elements , Vars , H);
 }
 
 
@@ -540,5 +658,45 @@ def hironaka(Expr , Ps , Ss , Ys){
     }
     return Ret;
 }
+
+
+
+/* ---------  some tests  ----------*/
+def assert(V){
+   if(!V){error(V);}
+   return 1;
+}
+
+
+def test(){
+  Z2 = newalg(x^2+1);
+  /* Shepard-Todd No.8 */
+  ST8 = grp([newmat(2,2,[[1,1],[1,-1]])*(1+Z2)/2 , newmat(2,2,[[1,0],[0,Z2]])]);
+  assert(length(ST8)==96);
+  Tmp = finvar(ST8,[x,y]);
+  assert(memq(x^8+14*x^4*y^4+y^8 , Tmp[0]));
+  assert(memq(x^12-33*y^4*x^8-33*y^8*x^4+y^12 , Tmp[0]));
+
+  Z5 = newalg(x^4+x^3+x^2+x+1);
+  Root5 = -2*(Z5^2+Z5^3) - 1;
+
+  /* Shepard-Todd No.16 */
+  ST16 = grp([newmat(2,2,[[Z5^4-Z5 ,Z5^2-Z5^3],[Z5^2-Z5^3,Z5-Z5^4]])/Root5 , newmat(2,2,[[Z5^2-Z5^4,Z5^4-1],[1-Z5,Z5^3-Z5]])/Root5 , newmat(2,2,[[Z5,0],[0,Z5]])]);
+  assert(length(ST16)==600);
+
+  /* Shephard-Todd No.23 */
+  ST23 = grp([newmat(3,3,[[-1,0,0],[(Root5+1)/2,1,0],[0,0,1]]),newmat(3,3,[[1,(Root5+1)/2,0],[0,-1,0],[0,1,1]]),newmat(3,3,[[1,0,0],[0,1,1],[0,0,-1]])]);
+  assert(length(ST23)==120);
+
+
+  Z28 = newalg(x^12-x^10+x^8-x^6+x^4-x^2+1);
+  Root7 = (-2*Z28^11+2*Z28^9-1*Z28^7+2*Z28);
+  /*  Shephard-Todd No.24  */
+  ST24 = grp([newmat(3,3,[[Z28^13-Z28,Z28^3-Z28^11,Z28^9-Z28^5],[Z28^3-Z28^11,Z28^5-Z28^9,Z28^13-Z28],[Z28^9-Z28^5,Z28^13-Z28,Z28^11-Z28^3]])/Root7,newmat(3,3,[[Z28^4,0,0],[0,Z28^8,0],[0,0,Z28^16]]),newmat(3,3,[[-1,0,0],[0,-1,0],[0,0,-1]])]);
+  assert(length(ST24)==336);
+  Tmp = finvar(ST24, [x,y,z]);
+  assert(memq(z*x^3+y^3*x-z^3*y , Tmp[0]));
+}
+
 
 
